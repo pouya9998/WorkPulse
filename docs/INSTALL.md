@@ -1,24 +1,24 @@
-# راهنمای نصب با Docker Compose
+# Install with Docker Compose
 
-## پیش‌نیاز
+## Prerequisites
 
 - Docker Engine
 - Docker Compose v2+
-- حداقل ۲GB RAM آزاد
+- At least ~2GB free RAM
 
-نیازی به نصب Node.js، Go یا PostgreSQL روی Host برای اجرای نسخه Dockerized نیست.
+You do not need Node.js, Go, or PostgreSQL installed on the host for the Dockerized stack.
 
-## نصب
+## Install
 
 ```bash
-git clone <repo-url> WorkPulse
+git clone https://github.com/pouya9998/WorkPulse.git
 cd WorkPulse
 cp .env.example .env
-# مقادیر رمز عبور، JWT و مدیر اولیه را ویرایش کنید
+# Edit passwords, JWT secret, encryption key, and bootstrap admin credentials
 docker compose up -d --build
 ```
 
-## بررسی وضعیت
+## Verify
 
 ```bash
 docker compose ps
@@ -26,25 +26,25 @@ docker compose logs -f
 curl http://localhost:4000/api/health
 ```
 
-پنل وب: `http://localhost:3000`  
+Web UI: `http://localhost:3000`  
 Swagger: `http://localhost:4000/api/docs`
 
-ورود اولیه با `BOOTSTRAP_ADMIN_EMAIL` و `BOOTSTRAP_ADMIN_PASSWORD` از فایل `.env`.
+Initial login uses `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` from `.env`.
 
-Bootstrap فقط زمانی مدیر می‌سازد که هنوز هیچ کاربری وجود نداشته باشد.
+Bootstrap creates an admin only when no users exist yet.
 
-## توقف
+## Stop
 
 ```bash
 docker compose down
 ```
 
-داده‌های دیتابیس در Volume `workpulse_pg_data` باقی می‌مانند.
+Database data remains in the `workpulse_pg_data` volume.
 
-## حذف کامل داده (خطرناک)
+## Full data wipe (dangerous)
 
 ```bash
 docker compose down -v
 ```
 
-این فرمان Volumeها را حذف می‌کند و داده‌ها از بین می‌روند.
+This deletes volumes and all stored data.

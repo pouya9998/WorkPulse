@@ -1,4 +1,4 @@
-# پشتیبان‌گیری و بازگردانی
+# Backup and restore
 
 ## Backup
 
@@ -7,7 +7,7 @@ chmod +x infra/scripts/backup.sh
 ./infra/scripts/backup.sh
 ```
 
-فایل در مسیر `backups/workpulse-<timestamp>.sql.gz` ذخیره می‌شود.
+The dump is written to `backups/workpulse-<timestamp>.sql.gz`.
 
 ## Restore
 
@@ -16,4 +16,4 @@ chmod +x infra/scripts/restore.sh
 ./infra/scripts/restore.sh backups/workpulse-YYYYMMDDTHHMMSSZ.sql.gz
 ```
 
-هشدار: Restore داده‌های فعلی را بازنویسی می‌کند.
+Warning: restore overwrites the current database contents.

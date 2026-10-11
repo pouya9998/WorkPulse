@@ -1,54 +1,55 @@
-# راهنمای مشارکت در WorkPulse
+# Contributing to WorkPulse
 
-از مشارکت شما استقبال می‌کنیم.
+Thanks for your interest in contributing.
 
-## پیش‌نیاز توسعه محلی
+## Local development prerequisites
 
 - Node.js 20+
-- Docker و Docker Compose
-- (اختیاری برای Agent) Go 1.22+
+- Docker and Docker Compose
+- (Optional, for the agent) Go 1.22+
 
-## راه‌اندازی محیط توسعه
+## Getting started
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-پنل: `http://localhost:3000`  
-API و Swagger: `http://localhost:4000/api/docs`
+Web UI: `http://localhost:3000`  
+API / Swagger: `http://localhost:4000/api/docs`
 
-## ساختار
+## Repository layout
 
-- `apps/api` — Backend NestJS + Prisma
-- `apps/web` — Frontend Next.js (فارسی/RTL)
-- `apps/agent` — Desktop Agent (Go)
-- `packages/shared-types` — تایپ‌های مشترک
-- `infra` — Docker و اسکریپت‌ها
-- `docs` — مستندات
+- `apps/api` — NestJS + Prisma backend
+- `apps/web` — Next.js frontend (Persian / RTL product UI)
+- `apps/agent` — Desktop agent (Go)
+- `packages/` — shared packages
+- `infra` — Docker and scripts
+- `docs/` — English documentation
 
-## قواعد کدنویسی
+## Coding guidelines
 
-1. UI قابل مشاهده برای کاربر باید فارسی و RTL باشد.
-2. زمان‌ها در Backend به‌صورت UTC ذخیره شوند.
-3. Secret واقعی در کد یا Git قرار نگیرد.
-4. قابلیت‌های اصلی نباید صرفاً نمایشی باشند.
-5. برای منطق حساس (حضور، حقوق، دسترسی) تست بنویسید.
-6. کاربران دارای سابقه را حذف فیزیکی نکنید؛ غیرفعال کنید.
+1. User-visible product UI must remain Persian and RTL.
+2. Repository markdown docs (`README`, `docs/*`, `CONTRIBUTING`) should be English.
+3. Store timestamps in UTC in the backend.
+4. Never commit real secrets.
+5. Core features must not be purely decorative/fake.
+6. Add tests for sensitive logic (attendance, payroll, access control).
+7. Do not hard-delete users that have attendance, contract, or payroll history; deactivate them.
 
-## تست
+## Tests
 
 ```bash
-# تست واحد API
+# API unit tests
 npm run test --workspace=@workpulse/api
 
-# تست e2e (نیاز به DATABASE_URL)
+# e2e (requires DATABASE_URL)
 export DATABASE_URL="postgresql://workpulse:change_me_strong_password@localhost:5432/workpulse?schema=public"
 npm run test:e2e --workspace=@workpulse/api
 ```
 
-## Pull Request
+## Pull requests
 
-- یک موضوع مشخص در هر PR
-- توضیح تغییرات و نحوه تست
-- به‌روزرسانی `docs/STATUS.md` در صورت تغییر وضعیت قابلیت‌ها
+- Keep each PR focused on one topic
+- Describe the change and how you tested it
+- Update `docs/STATUS.md` when feature status changes

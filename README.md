@@ -1,82 +1,82 @@
 # WorkPulse
 
-**پلتفرم متن‌باز مدیریت نیروی انسانی ریموت و ارزیابی عملکرد مهندسان نرم‌افزار**
+**Open-source platform for remote workforce management and software-engineer performance evaluation**
 
-WorkPulse برای تیم‌های دورکار نرم‌افزاری طراحی شده است: حضور کاری، وضعیت دستگاه (Agent)، جلسات، فعالیت مهندسی (GitLab)، هشدارها، قرارداد و گزارش پیشنهادی حقوق — با رابط کاملاً فارسی و RTL.
+WorkPulse helps remote engineering teams manage attendance, device/agent status, meetings, engineering activity (GitLab), alerts, contracts, and proposed payroll reports — with a Persian RTL product UI and Jalali calendar support.
 
 | | |
 |---|---|
-| مجوز | [AGPL-3.0-or-later](LICENSE) |
-| معماری | Modular Monolith |
-| UI | فارسی · RTL · تقویم شمسی · Vazirmatn |
-| استقرار | Docker Compose (on-premises) |
+| License | [AGPL-3.0-or-later](LICENSE) |
+| Architecture | Modular monolith |
+| Product UI | Persian · RTL · Jalali calendar · Vazirmatn |
+| Deployment | Docker Compose (on-premises) |
 
 ---
 
-## فهرست مطالب
+## Table of contents
 
-- [ویژگی‌ها](#ویژگیها)
-- [معماری و تکنولوژی](#معماری-و-تکنولوژی)
-- [پیش‌نیازها](#پیشنیازها)
-- [اجرای سریع با Docker](#اجرای-سریع-با-docker)
-- [ساختار Repository](#ساختار-repository)
-- [پیکربندی محیط](#پیکربندی-محیط)
+- [Features](#features)
+- [Architecture and stack](#architecture-and-stack)
+- [Requirements](#requirements)
+- [Quick start with Docker](#quick-start-with-docker)
+- [Repository structure](#repository-structure)
+- [Environment configuration](#environment-configuration)
 - [Desktop Agent](#desktop-agent)
-- [توسعه محلی](#توسعه-محلی)
-- [تست‌ها](#تستها)
-- [Backup و Restore](#backup-و-restore)
-- [مستندات](#مستندات)
-- [وضعیت پیاده‌سازی](#وضعیت-پیادهسازی)
-- [امنیت و حریم خصوصی](#امنیت-و-حریم-خصوصی)
-- [مشارکت](#مشارکت)
-- [مجوز](#مجوز)
+- [Local development](#local-development)
+- [Tests](#tests)
+- [Backup and restore](#backup-and-restore)
+- [Documentation](#documentation)
+- [Implementation status](#implementation-status)
+- [Security and privacy](#security-and-privacy)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## ویژگی‌ها
+## Features
 
-### مدیریت کاربران و دسترسی
-- ایجاد، ویرایش، فعال/غیرفعال‌سازی کاربر (بدون حذف فیزیکی سابقه)
-- نقش‌ها: Super Admin، Organization Admin، Team Lead، Employee، Payroll Reviewer
-- RBAC واقعی در Backend + نشست JWT قابل لغو
-- Bootstrap امن مدیر اولیه (فقط وقتی هنوز کاربری وجود ندارد)
+### Users and access control
+- Create, edit, activate/deactivate users (no hard-delete of historical records)
+- Roles: Super Admin, Organization Admin, Team Lead, Employee, Payroll Reviewer
+- Real backend RBAC and revocable JWT sessions
+- Secure bootstrap of the first admin (only when no users exist yet)
 
-### حضور و Agent دسکتاپ
-- شروع / پایان کار، Heartbeat (پیش‌فرض ۶۰ ثانیه)
-- تشخیص Idle و قفل صفحه (بهترین تلاش روی Linux / Windows)
-- صف آفلاین محلی و همگام‌سازی مجدد
-- ثبت دستگاه و لغو دسترسی توسط مدیر
-- **Agent اسکرین‌شات، کلید، Clipboard، صدا یا تصویر ضبط نمی‌کند**
+### Attendance and desktop agent
+- Work start / end and heartbeat (default every 60 seconds)
+- Idle and screen-lock detection (best effort on Linux / Windows)
+- Local offline queue with resync
+- Device registration and admin revoke
+- **The agent does not capture screenshots, keystrokes, clipboard, audio, or video**
 
-### جلسات
-- ثبت دستی جلسه، شرکت‌کنندگان، لغو، تشخیص تداخل با نشست کاری
-- Adapter تقویم قابل توسعه (OAuth واقعی Google/Outlook در نسخه فعلی stub است)
+### Meetings
+- Manual meeting create/cancel, participants, overlap detection vs work sessions
+- Extensible calendar adapter (real Google/Outlook OAuth is stubbed in the current version)
 
 ### GitLab
-- اتصال به GitLab.com یا Self-hosted
-- Webhook با اعتبارسنجی secret
-- نگاشت صریح هویت GitLab به کارمند
-- گزارش فعالیت مهندسی با یادداشت ناقص بودن داده  
-  (Commit/MR به‌تنهایی معیار بهره‌وری قطعی نیست)
+- Connect to GitLab.com or self-hosted GitLab
+- Webhooks with optional secret validation
+- Explicit GitLab identity mapping to employees
+- Engineering activity report with incompleteness notes  
+  (commits/MRs alone are not treated as definitive productivity)
 
-### قرارداد و حقوق پیشنهادی
-- قرارداد ساعتی و تمام‌وقت ریموت با **نسخه‌بندی**
-- محاسبات مالی با Decimal (بدون float)
-- تمام‌وقت به‌خاطر Idle یا قطع Heartbeat خودکار کم نمی‌شود
-- گردش تأیید/رد گزارش توسط بازبین
+### Contracts and proposed payroll
+- Hourly and full-time remote contracts with **versioning**
+- Money math with Decimal (no floating point)
+- Full-time pay is not auto-reduced for idle/missing heartbeat
+- Reviewer approve/reject workflow for proposals
 
-### هشدار، گزارش و حسابرسی
-- هشدارهای قابل تنظیم + اعلان درون‌پنلی
-- اصلاح حضور با تأیید مدیر
-- گزارش مدیریتی و خروجی حسابرسی
-- Audit Log برای رویدادهای حساس
+### Alerts, reports, and audit
+- Configurable alerts and in-panel notifications
+- Attendance corrections with manager approval
+- Management reports and audit export
+- Audit log for sensitive actions
 
 ---
 
-## معماری و تکنولوژی
+## Architecture and stack
 
 ```
-[مرورگر RTL/FA] ---> [Next.js Web]
+[Browser RTL/FA] ---> [Next.js Web]
                          |
                          v
                    [NestJS API] <--- [Go Desktop Agent]
@@ -85,82 +85,82 @@ WorkPulse برای تیم‌های دورکار نرم‌افزاری طراحی
                    [PostgreSQL]
 ```
 
-| لایه | تکنولوژی |
+| Layer | Technology |
 |------|-----------|
-| Frontend | Next.js، TypeScript، Tailwind، date-fns-jalali |
-| Backend | NestJS، Prisma، REST، OpenAPI/Swagger |
-| Database | PostgreSQL + Migration نسخه‌بندی‌شده |
+| Frontend | Next.js, TypeScript, Tailwind, date-fns-jalali |
+| Backend | NestJS, Prisma, REST, OpenAPI/Swagger |
+| Database | PostgreSQL with versioned migrations |
 | Agent | Go (Linux / Windows) |
-| Infra | Docker Compose، Healthcheck، Volume پایدار |
+| Infra | Docker Compose, healthchecks, persistent volume |
 
-جزئیات: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## پیش‌نیازها
+## Requirements
 
-### اجرای Dockerized (پیشنهادی)
+### Dockerized run (recommended)
 - Docker Engine
 - Docker Compose v2+
-- حدود ۲GB RAM آزاد
+- About 2GB free RAM
 
-نیازی به نصب Node.js، Go یا PostgreSQL روی Host برای نسخه Dockerized نیست.
+You do not need Node.js, Go, or PostgreSQL on the host for the Dockerized stack.
 
-### توسعه محلی (اختیاری)
+### Local development (optional)
 - Node.js 20+
-- Go 1.22+ (برای Agent)
-- PostgreSQL (یا سرویس compose)
+- Go 1.22+ (for the agent)
+- PostgreSQL (or Compose Postgres)
 
 ---
 
-## اجرای سریع با Docker
+## Quick start with Docker
 
 ```bash
 git clone https://github.com/pouya9998/WorkPulse.git
 cd WorkPulse
 cp .env.example .env
-# حتماً POSTGRES_PASSWORD، JWT_SECRET، ENCRYPTION_KEY و رمز مدیر را عوض کنید
+# Change POSTGRES_PASSWORD, JWT_SECRET, ENCRYPTION_KEY, and bootstrap admin password
 docker compose up -d --build
 ```
 
-| سرویس | آدرس |
+| Service | URL |
 |--------|------|
-| پنل وب | http://localhost:3000 |
+| Web UI | http://localhost:3000 |
 | API | http://localhost:4000/api |
 | Swagger | http://localhost:4000/api/docs |
 
-ورود اولیه با `BOOTSTRAP_ADMIN_EMAIL` و `BOOTSTRAP_ADMIN_PASSWORD` از فایل `.env`.
+Initial login uses `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` from `.env`.
 
-### فرمان‌های رایج
+### Common commands
 
 ```bash
 docker compose ps
 docker compose logs -f
-docker compose down          # داده Volume حفظ می‌شود
-docker compose down -v       # خطرناک: حذف Volumeها و تمام داده‌ها
+docker compose down          # keeps the database volume
+docker compose down -v       # destructive: deletes volumes and all data
 ```
 
-Migration هنگام استارت کانتینر API با `prisma migrate deploy` اعمال می‌شود.
+Migrations run on API startup via `prisma migrate deploy`.
 
-راهنمای نصب: [docs/INSTALL.md](docs/INSTALL.md)  
-راهنمای Production: [docs/PRODUCTION.md](docs/PRODUCTION.md)
+Install guide: [docs/INSTALL.md](docs/INSTALL.md)  
+Production guide: [docs/PRODUCTION.md](docs/PRODUCTION.md)
 
 ---
 
-## ساختار Repository
+## Repository structure
 
 ```
 WorkPulse/
 ├── apps/
-│   ├── api/                 # Backend NestJS + Prisma
-│   ├── web/                 # Frontend Next.js (فارسی / RTL)
-│   └── agent/               # Desktop Agent (Go)
+│   ├── api/                 # NestJS + Prisma backend
+│   ├── web/                 # Next.js frontend (Persian / RTL UI)
+│   └── agent/               # Go desktop agent
 ├── packages/
-│   └── shared-types/        # تایپ‌های مشترک
+│   └── shared-types/        # Shared TypeScript types
 ├── infra/
-│   ├── docker/              # Dockerfileها و entrypoint
-│   └── scripts/             # Backup / Restore
-├── docs/                    # مستندات
+│   ├── docker/              # Dockerfiles and entrypoint
+│   └── scripts/             # Backup / restore
+├── docs/                    # Documentation (English)
 ├── docker-compose.yml
 ├── .env.example
 ├── LICENSE                  # AGPL-3.0
@@ -170,23 +170,23 @@ WorkPulse/
 
 ---
 
-## پیکربندی محیط
+## Environment configuration
 
-فایل `.env.example` را کپی کنید و مقادیر را تنظیم کنید. **هرگز `.env` را در Git قرار ندهید.**
+Copy `.env.example` and set values. **Never commit `.env`.**
 
-متغیرهای مهم:
+Important variables:
 
-| متغیر | توضیح |
+| Variable | Purpose |
 |--------|--------|
-| `POSTGRES_*` / `DATABASE_URL` | اتصال PostgreSQL |
-| `JWT_SECRET` | کلید امضای JWT (قوی و تصادفی) |
-| `ENCRYPTION_KEY` | رمزنگاری توکن GitLab |
-| `CORS_ORIGINS` | مبدأهای مجاز Frontend |
-| `BOOTSTRAP_ADMIN_*` | مدیر اولیه (فقط نصب خالی) |
-| `GITLAB_WEBHOOK_SECRET` | اعتبارسنجی Webhook (اختیاری) |
-| `NEXT_PUBLIC_API_URL` | آدرس API از دید مرورگر |
+| `POSTGRES_*` / `DATABASE_URL` | PostgreSQL connection |
+| `JWT_SECRET` | JWT signing secret (strong random value) |
+| `ENCRYPTION_KEY` | Encrypt GitLab tokens at rest |
+| `CORS_ORIGINS` | Allowed frontend origins |
+| `BOOTSTRAP_ADMIN_*` | First admin (empty-install only) |
+| `GITLAB_WEBHOOK_SECRET` | Webhook validation (optional) |
+| `NEXT_PUBLIC_API_URL` | API URL as seen by the browser |
 
-نکته: اگر در شِل `DATABASE_URL=...@localhost` export شده باشد، Compose آن را بر `.env` اولویت می‌دهد و کانتینر API ممکن است به دیتابیس وصل نشود. قبل از `docker compose up` آن را `unset` کنید.
+Note: if your shell exports `DATABASE_URL=...@localhost`, Compose prefers that over `.env` and the API container may fail to reach Postgres. `unset DATABASE_URL` before `docker compose up`.
 
 ---
 
@@ -194,7 +194,7 @@ WorkPulse/
 
 ```bash
 cd apps/agent
-make build-linux    # یا make build-windows / make build-all
+make build-linux    # or make build-windows / make build-all
 
 ./bin/workpulse-agent-linux-amd64 login \
   -api http://localhost:4000/api \
@@ -207,112 +207,113 @@ make build-linux    # یا make build-windows / make build-all
 ./bin/workpulse-agent-linux-amd64 status
 ```
 
-تنظیمات در `~/.workpulse/config.json` و صف آفلاین در `~/.workpulse/offline-queue.db`.
+Config: `~/.workpulse/config.json`  
+Offline queue: `~/.workpulse/offline-queue.db`
 
-راهنمای کامل: [docs/AGENT.md](docs/AGENT.md)
+Full guide: [docs/AGENT.md](docs/AGENT.md)
 
 ---
 
-## توسعه محلی
+## Local development
 
 ```bash
 cp .env.example .env
-# DATABASE_URL را برای Host روی localhost تنظیم کنید
+# Point DATABASE_URL at localhost for host-side development
 npm install
 npm run prisma:generate --workspace=@workpulse/api
 npm run prisma:migrate --workspace=@workpulse/api
-npm run dev:api    # معمولاً :4000
-npm run dev:web    # معمولاً :3000
+npm run dev:api    # usually :4000
+npm run dev:web    # usually :3000
 ```
 
 ---
 
-## تست‌ها
+## Tests
 
 ```bash
-# واحد
+# Unit
 npm run test --workspace=@workpulse/api
 
-# e2e (نیاز به PostgreSQL در دسترس)
+# e2e (requires reachable PostgreSQL)
 export DATABASE_URL="postgresql://workpulse:change_me_strong_password@localhost:5432/workpulse?schema=public"
 export JWT_SECRET="change_me_jwt_secret_min_32_chars_long!!"
 export ENCRYPTION_KEY="change_me_encryption_key_min_32_chars"
-# برای جلوگیری از Bootstrap ناخواسته در تست:
+# Avoid accidental bootstrap during tests:
 export BOOTSTRAP_ADMIN_EMAIL=""
 export BOOTSTRAP_ADMIN_PASSWORD=""
 npm run test:e2e --workspace=@workpulse/api
 ```
 
-هشدار: تست‌های e2e ممکن است داده‌های دیتابیس تست را پاک کنند؛ روی محیط Production اجرا نکنید.
+Warning: e2e tests may wipe test database data. Do not run them against production.
 
 ---
 
-## Backup و Restore
+## Backup and restore
 
 ```bash
 ./infra/scripts/backup.sh
 ./infra/scripts/restore.sh backups/workpulse-YYYYMMDDTHHMMSSZ.sql.gz
 ```
 
-جزئیات: [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md)
+Details: [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md)
 
 ---
 
-## مستندات
+## Documentation
 
-| سند | موضوع |
+| Doc | Topic |
 |-----|--------|
-| [docs/INSTALL.md](docs/INSTALL.md) | نصب Docker Compose |
-| [docs/PRODUCTION.md](docs/PRODUCTION.md) | استقرار Production |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | معماری |
-| [docs/API.md](docs/API.md) | نمای کلی API |
-| [docs/AGENT.md](docs/AGENT.md) | Desktop Agent |
-| [docs/GITLAB.md](docs/GITLAB.md) | اتصال GitLab |
-| [docs/CALENDAR.md](docs/CALENDAR.md) | جلسات و تقویم |
-| [docs/SECURITY.md](docs/SECURITY.md) | امنیت و حریم خصوصی |
-| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | پشتیبان‌گیری |
-| [docs/STATUS.md](docs/STATUS.md) | وضعیت واقعی پیاده‌سازی |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | راهنمای توسعه |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | مشارکت |
+| [docs/INSTALL.md](docs/INSTALL.md) | Docker Compose install |
+| [docs/PRODUCTION.md](docs/PRODUCTION.md) | Production deployment |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture |
+| [docs/API.md](docs/API.md) | API overview |
+| [docs/AGENT.md](docs/AGENT.md) | Desktop agent |
+| [docs/GITLAB.md](docs/GITLAB.md) | GitLab integration |
+| [docs/CALENDAR.md](docs/CALENDAR.md) | Meetings and calendar |
+| [docs/SECURITY.md](docs/SECURITY.md) | Security and privacy |
+| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Backup / restore |
+| [docs/STATUS.md](docs/STATUS.md) | Honest implementation status |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Development notes |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributing guide |
 
-پس از اجرا، مستندات تعاملی API در `/api/docs` در دسترس است.
-
----
-
-## وضعیت پیاده‌سازی
-
-فازهای ۱ تا ۷ پیاده‌سازی شده‌اند. محدودیت‌های واقعی (مثلاً OAuth تقویم stub، sync محدود GitLab، نبود اعلان ایمیل) در [docs/STATUS.md](docs/STATUS.md) مستند شده‌اند.
-
-ادعای «پیاده‌سازی‌شده» فقط جایی است که کد و تست مربوط وجود دارد.
+Interactive API docs are available at `/api/docs` after startup.
 
 ---
 
-## امنیت و حریم خصوصی
+## Implementation status
 
-- Secret در سورس کد نیست؛ فقط Environment Variables
-- bcrypt برای رمز عبور، JWT + نشست قابل لغو
-- ایزوله بودن داده بین سازمان‌ها
-- Rate limiting، CORS محدود، هدرهای امنیتی پایه
-- رمزنگاری توکن GitLab سمت سرور
-- Audit Log با سانسور فیلدهای حساس
+Phases 1–7 are implemented. Real limitations (for example stub calendar OAuth, limited GitLab sync, no email notifications) are documented in [docs/STATUS.md](docs/STATUS.md).
 
-جزئیات: [docs/SECURITY.md](docs/SECURITY.md)
+A feature is only claimed as implemented when the corresponding code and tests exist.
 
 ---
 
-## مشارکت
+## Security and privacy
 
-از Pull Request خوش‌آمد می‌گوییم. لطفاً [CONTRIBUTING.md](CONTRIBUTING.md) را بخوانید:
+- No real secrets in source; use environment variables
+- bcrypt password hashing; JWT with revocable sessions
+- Organization data isolation
+- Rate limiting, restricted CORS, basic security headers
+- GitLab tokens encrypted server-side
+- Audit log with sensitive-field redaction
 
-1. UI قابل مشاهده برای کاربر فارسی و RTL باشد.
-2. زمان‌ها در Backend به‌صورت UTC ذخیره شوند.
-3. قابلیت اصلی صرفاً نمایشی نباشد.
-4. برای منطق حساس تست بنویسید.
+Details: [docs/SECURITY.md](docs/SECURITY.md)
 
 ---
 
-## مجوز
+## Contributing
 
-این پروژه تحت مجوز **GNU Affero General Public License v3.0 or later** منتشر می‌شود.
+Pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md):
 
-متن کامل: [LICENSE](LICENSE)
+1. User-visible product UI stays Persian and RTL.
+2. Store timestamps in UTC in the backend.
+3. Core features must not be fake/demo-only.
+4. Add tests for sensitive logic.
+
+---
+
+## License
+
+Released under the **GNU Affero General Public License v3.0 or later**.
+
+Full text: [LICENSE](LICENSE)

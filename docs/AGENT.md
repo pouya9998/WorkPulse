@@ -1,84 +1,85 @@
-# راهنمای Desktop Agent
+# Desktop Agent guide
 
-نسخه فعلی Agent: **0.2.0** (فاز ۲)
+Current agent version: **0.2.0** (phase 2)
 
-## آنچه پیاده‌سازی شده
+## Implemented
 
-- ثبت دستگاه با ایمیل/رمز کاربر (`login`)
-- شروع و پایان کار (`start-work` / `end-work`)
-- Heartbeat پیش‌فرض هر ۶۰ ثانیه (`run`)
-- تشخیص Idle و قفل صفحه در Linux/Windows (بهترین تلاش با APIهای در دسترس)
-- صف آفلاین محلی SQLite و همگام‌سازی مجدد (`sync` / حلقه `run`)
-- نمایش وضعیت اتصال و اندازه صف
-- لغو دسترسی دستگاه از پنل وب/API
+- Device registration with user email/password (`login`)
+- Work start / end (`start-work` / `end-work`)
+- Heartbeat every 60 seconds by default (`run`)
+- Idle and screen-lock detection on Linux/Windows (best effort)
+- Local SQLite offline queue and resync (`sync` / `run` loop)
+- Connection status and queue size display
+- Device access revoke from web/API
 
-## آنچه Agent جمع‌آوری نمی‌کند
+## Not collected by the agent
 
-- اسکرین‌شات
-- کلیدهای تایپ‌شده
+- Screenshots
+- Keystrokes
 - Clipboard
-- صدا یا تصویر
+- Audio or video
 
-## ساخت
+## Build
 
-پیش‌نیاز: Go 1.22+
+Prerequisite: Go 1.22+
 
 ```bash
 cd apps/agent
 make build-linux
 make build-windows
-# یا
+# or
 make build-all
 ```
 
-خروجی: `apps/agent/bin/`
+Output: `apps/agent/bin/`
 
-## استفاده
+## Usage
 
 ```bash
-# ثبت دستگاه
+# Register device
 ./bin/workpulse-agent-linux-amd64 login \
   -api http://localhost:4000/api \
   -email employee@example.com \
   -password '********' \
-  -name "لپ‌تاپ کاری"
+  -name "Work laptop"
 
-# اجرای پس‌زمینه
+# Background loop
 ./bin/workpulse-agent-linux-amd64 run
 
-# شروع / پایان کار
+# Work start / end
 ./bin/workpulse-agent-linux-amd64 start-work
 ./bin/workpulse-agent-linux-amd64 end-work
 
-# وضعیت محلی
+# Local status
 ./bin/workpulse-agent-linux-amd64 status
 ```
 
-تنظیمات در `~/.workpulse/config.json` و صف آفلاین در `~/.workpulse/offline-queue.db` ذخیره می‌شود.
+Settings are stored in `~/.workpulse/config.json`.  
+Offline queue is stored in `~/.workpulse/offline-queue.db`.
 
-## نکات پلتفرم
+## Platform notes
 
 ### Linux
-- Idle: در صورت وجود `xprintidle`
-- قفل صفحه: از طریق `loginctl LockedHint` در صورت دسترسی نشست
-- بدون نیاز به root
+- Idle: via `xprintidle` when available
+- Lock: via `loginctl LockedHint` when session APIs are available
+- No root required
 
 ### Windows
 - Idle: `GetLastInputInfo`
-- قفل صفحه: بررسی دسترسی به Input Desktop
+- Lock: input-desktop accessibility check
 
-اگر API سیستم‌عامل در دسترس نباشد، Agent همچنان کار می‌کند و مقدار Idle/Lock را ۰/false گزارش می‌کند.
+If OS APIs are unavailable, the agent still runs and reports idle/lock as `0` / `false`.
 
-## APIهای مرتبط
+## Related APIs
 
-| مسیر | توضیح |
+| Path | Description |
 |------|--------|
-| `POST /api/agent/register` | ثبت دستگاه |
-| `POST /api/agent/work/start` | شروع کار |
-| `POST /api/agent/work/end` | پایان کار |
+| `POST /api/agent/register` | Register device |
+| `POST /api/agent/work/start` | Start work |
+| `POST /api/agent/work/end` | End work |
 | `POST /api/agent/heartbeat` | Heartbeat |
-| `POST /api/agent/events/sync` | همگام‌سازی دسته‌ای |
-| `GET /api/devices` | فهرست دستگاه‌ها |
-| `POST /api/devices/:id/revoke` | لغو دستگاه |
-| `GET /api/attendance/status` | وضعیت حضور |
-| `GET /api/attendance/timeline` | تایم‌لاین |
+| `POST /api/agent/events/sync` | Batch sync |
+| `GET /api/devices` | List devices |
+| `POST /api/devices/:id/revoke` | Revoke device |
+| `GET /api/attendance/status` | Attendance status |
+| `GET /api/attendance/timeline` | Timeline |

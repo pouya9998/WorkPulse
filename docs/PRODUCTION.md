@@ -1,53 +1,53 @@
-# راهنمای Production
+# Production guide
 
-## پیش از استقرار
+## Before deploy
 
-1. `.env` را از `.env.example` بسازید و همه Secretها را عوض کنید:
+1. Create `.env` from `.env.example` and rotate all secrets:
    - `POSTGRES_PASSWORD`
-   - `JWT_SECRET` (حداقل ۳۲ کاراکتر تصادفی)
-   - `ENCRYPTION_KEY` (حداقل ۳۲ کاراکتر؛ برای توکن GitLab)
+   - `JWT_SECRET` (random, at least 32 characters)
+   - `ENCRYPTION_KEY` (at least 32 characters; used for GitLab tokens)
    - `BOOTSTRAP_ADMIN_PASSWORD`
-   - در صورت نیاز `GITLAB_WEBHOOK_SECRET`
-2. `CORS_ORIGINS` را فقط به دامنه پنل محدود کنید.
-3. پورت PostgreSQL را به اینترنت باز نکنید (در compose فقط برای توسعه expose شده).
-4. جلوی سرویس‌ها Reverse Proxy با HTTPS بگذارید (Caddy/Nginx).
-5. پس از اولین ورود، رمز مدیر Bootstrap را عوض کنید.
+   - `GITLAB_WEBHOOK_SECRET` if you use GitLab webhooks
+2. Restrict `CORS_ORIGINS` to your real web origin(s).
+3. Do not expose PostgreSQL to the public internet (Compose currently maps `5432` for development convenience).
+4. Put HTTPS in front of the services (Caddy/Nginx reverse proxy).
+5. Change the bootstrap admin password immediately after first login.
 
-## استقرار
+## Deploy
 
 ```bash
 cp .env.example .env
-# ویرایش Secretها
+# Edit secrets
 docker compose up -d --build
 docker compose ps
 curl https://your-api.example/api/health
 ```
 
-Migration هنگام استارت API با `prisma migrate deploy` اعمال می‌شود.
+Migrations are applied on API startup with `prisma migrate deploy`.
 
-## پشتیبان‌گیری
+## Backup
 
 ```bash
 ./infra/scripts/backup.sh
 ./infra/scripts/restore.sh backups/workpulse-....sql.gz
 ```
 
-هشدار: `docker compose down -v` Volume و داده‌ها را حذف می‌کند.
+Warning: `docker compose down -v` deletes volumes and data.
 
-## مانیتورینگ حداقل
+## Minimum monitoring
 
-- Healthcheck کانتینرها
-- لاگ: `docker compose logs -f api`
-- بررسی دوره‌ای `/api/reports/overview` توسط مدیر
+- Container healthchecks
+- Logs: `docker compose logs -f api`
+- Periodic review of `/api/reports/overview` by an admin
 
-## سخت‌سازی انجام‌شده در کد
+## Hardening already in the codebase
 
-- Hash رمز با bcrypt
-- JWT + نشست قابل لغو
-- RBAC در Backend
+- bcrypt password hashing
+- JWT + revocable sessions
+- Backend RBAC
 - Rate limiting
-- CORS محدود
-- هدرهای امنیتی پایه
-- Audit log با سانسور فیلدهای حساس
-- رمزنگاری توکن GitLab سمت سرور
-- اعتبارسنجی Webhook GitLab (در صورت تنظیم secret)
+- Restricted CORS
+- Basic security headers
+- Audit log with sensitive-field redaction
+- Server-side GitLab token encryption
+- GitLab webhook secret validation when configured

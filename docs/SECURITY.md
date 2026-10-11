@@ -1,34 +1,34 @@
-# امنیت و حریم خصوصی
+# Security and privacy
 
-## اصول
+## Principles
 
-1. هیچ Secret واقعی در مخزن کد نیست؛ از `.env` استفاده کنید.
-2. رمز عبور با bcrypt هش می‌شود.
-3. دسترسی‌ها در Backend با Guard مجوز/نقش اعمال می‌شوند.
-4. داده‌های سازمان‌ها با فیلتر `organizationId` ایزوله هستند.
-5. توکن نشست و توکن دستگاه قابل لغو هستند.
-6. فیلدهای حساس در Audit Log سانسور می‌شوند.
-7. توکن GitLab با AES-256-GCM رمزگذاری و فقط سمت سرور نگهداری می‌شود.
-8. Webhook GitLab در صورت تنظیم `GITLAB_WEBHOOK_SECRET` اعتبارسنجی می‌شود.
+1. No real secrets in the repository; use `.env`.
+2. Passwords are hashed with bcrypt.
+3. Authorization is enforced in the backend with role/permission guards.
+4. Organization data is isolated with `organizationId` filters.
+5. Session tokens and device tokens are revocable.
+6. Sensitive fields are redacted from audit logs.
+7. GitLab tokens are encrypted with AES-256-GCM and stored only on the server.
+8. GitLab webhooks are validated when `GITLAB_WEBHOOK_SECRET` is set.
 
-## داده‌های Agent
+## Agent data collection
 
-Agent **نباید** اسکرین‌شات، کلیدهای تایپ‌شده، Clipboard، صدا یا تصویر ضبط کند.
+The agent **must not** capture screenshots, keystrokes, clipboard contents, audio, or video.
 
-داده‌های مجاز:
+Allowed data:
 
-- رویداد شروع/پایان کار
-- Heartbeat و وضعیت اتصال
-- Idle و قفل صفحه (در OSهای پشتیبانی‌شده)
-- نسخه Agent و شناسه دستگاه
+- Work start / end events
+- Heartbeat and connectivity state
+- Idle and screen lock (on supported OS APIs)
+- Agent version and device identifier
 
-## سخت‌سازی HTTP
+## HTTP hardening
 
-- CORS محدود به `CORS_ORIGINS`
+- CORS limited to `CORS_ORIGINS`
 - Rate limiting
-- هدرهای `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
-- ValidationPipe با whitelist
+- Headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
+- ValidationPipe with whitelist
 
-## توصیه‌های Production
+## Production recommendations
 
-جزئیات: [PRODUCTION.md](PRODUCTION.md)
+See [PRODUCTION.md](PRODUCTION.md).

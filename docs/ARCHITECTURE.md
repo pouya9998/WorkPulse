@@ -1,20 +1,20 @@
-# معماری WorkPulse
+# Architecture
 
-## رویکرد
+## Approach
 
-نسخه اول به‌صورت **Modular Monolith** طراحی شده است:
+The first release is a **modular monolith**:
 
-- یک Backend NestJS با ماژول‌های جدا (Auth، Users، Roles، Audit، …)
-- یک Frontend Next.js
-- یک Desktop Agent مستقل (Go)
-- یک پایگاه داده PostgreSQL
+- One NestJS backend with separated modules (Auth, Users, Roles, Attendance, Alerts, Meetings, GitLab, Payroll, …)
+- One Next.js frontend
+- One independent desktop agent (Go)
+- One PostgreSQL database
 
-این رویکرد برای استقرار on-premises روی سرور اختصاصی شرکت ساده‌تر از Microservices است و در عین حال مرزهای دامنه را برای رشد بعدی حفظ می‌کند.
+This is simpler to deploy on-premises than microservices, while keeping domain boundaries for later growth.
 
-## دیاگرام منطقی
+## Logical diagram
 
 ```
-[مرورگر RTL/FA] ---> [Next.js Web]
+[Browser RTL/FA] ---> [Next.js Web]
                          |
                          v
                    [NestJS API] <--- [Go Agent]
@@ -23,22 +23,22 @@
                    [PostgreSQL]
 ```
 
-## تصمیم‌های کلیدی
+## Key decisions
 
-| موضوع | تصمیم | دلیل |
+| Topic | Decision | Why |
 |--------|--------|------|
-| ORM | Prisma | Migration نسخه‌بندی‌شده، تایپ‌سیف، مناسب NestJS |
-| احراز هویت | JWT Bearer + جدول نشست | امکان لغو نشست و Audit |
-| چندسازمانی | `organizationId` روی موجودیت‌ها | ایزوله بودن داده |
-| Bootstrap | فقط وقتی `users.count = 0` | جلوگیری از ایجاد مدیر تکراری |
-| زمان | UTC در DB | تبدیل به TZ سازمان/کاربر در UI |
-| مجوز | AGPL-3.0 | مناسب نرم‌افزار سازمانی متن‌باز با شبکه |
+| ORM | Prisma | Versioned migrations, type-safe client, NestJS fit |
+| Auth | JWT Bearer + session table | Revocation and audit |
+| Multi-tenant | `organizationId` on entities | Data isolation |
+| Bootstrap | Only when `users.count = 0` | Prevent duplicate first admins |
+| Time | UTC in DB | Convert to org/user TZ in UI |
+| License | AGPL-3.0 | Open-source network-facing enterprise software |
 
-## ماژول‌های Backend (فاز ۱)
+## Backend modules (by phase)
 
-- `auth` — ورود/خروج/me
-- `users` — مدیریت کاربران
-- `roles` — نقش‌ها و مجوزهای سیستمی
-- `organizations` — سازمان جاری
-- `bootstrap` — راه‌اندازی اولیه
-- `audit` — رویدادهای حسابرسی
+- `auth`, `users`, `roles`, `organizations`, `bootstrap`, `audit`
+- `devices`, `attendance` (agent + timeline)
+- `attendance-policies`, `attendance-corrections`, `alerts`, `notifications`
+- `meetings` (+ calendar adapters)
+- `gitlab`, `payroll`
+- `reports`, `settings`

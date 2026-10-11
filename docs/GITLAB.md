@@ -1,30 +1,32 @@
-# راهنمای اتصال GitLab
+# GitLab integration
 
-وضعیت: **پیاده‌سازی‌شده (فاز ۵)**
+Status: **implemented for phase 5** (with limitations)
 
-## پیکربندی
+## Configuration
 
-1. در `.env` مقدار `ENCRYPTION_KEY` (ترجیحاً ۳۲+ کاراکتر) و در صورت نیاز `GITLAB_WEBHOOK_SECRET` را تنظیم کنید.
-2. از پنل **GitLab** (`/gitlab`) یا API:
-   - `POST /api/gitlab/connection` — Base URL و Personal Access Token
-   - `POST /api/gitlab/projects/connect` — انتخاب پروژه‌های فعال برای Webhook
-   - `POST /api/gitlab/mappings` — نگاشت صریح `userId` ↔ `gitlabUserId` / `gitlabUsername`
-3. Webhook در GitLab:
-   - URL: `https://<api-host>/api/gitlab/webhooks?organizationId=<org-id>`
-   - Secret Token: همان `GITLAB_WEBHOOK_SECRET`
-   - هدرها: `X-Gitlab-Token`, `X-Gitlab-Delivery`, `X-Gitlab-Event`
+- GitLab base URL (gitlab.com or self-hosted)
+- Access token stored encrypted on the server (`ENCRYPTION_KEY`)
+- Optional webhook secret (`GITLAB_WEBHOOK_SECRET`)
+- Explicit user mapping (do not assume email/username equality)
 
-## همگام‌سازی
+## Capabilities
 
-- `POST /api/gitlab/sync` — فهرست پروژه‌ها از API GitLab با صفحه‌بندی و تأخیر بین صفحات (Mock در تست e2e).
+- Configure connection and list/connect projects
+- User mappings CRUD (API; UI currently focuses on connection/status)
+- Webhook endpoint with idempotent event storage
+- Periodic sync helper (currently mainly project listing)
+- Engineering activity report with incompleteness notes
 
-## گزارش فعالیت مهندسی
+## Important product rules
 
-- `GET /api/gitlab/engineering/activity?from=&to=&userId=` (اختیاری)
-- **تعداد Commit به‌تنهایی معیار بهره‌وری نیست**؛ پاسخ شامل `disclaimerFa` و `dataIncompletenessNotesFa` است.
+- Tokens stay server-side only
+- Validate webhooks when a secret is configured
+- Never treat commit/MR counts alone as definitive productivity
 
-## محدودیت‌های فعلی
+## Limitations
 
-- Review روی MR فقط در صورت ارسال رویداد مناسب از GitLab ثبت می‌شود؛ همگام‌سازی تاریخچه MR/Review از API هنوز stub است.
-- Push Hook فقط شمارنده آماری commit در `EngineeringMetric` را به‌روز می‌کند (بدون امتیازدهی).
-- اتصال واقعی به GitLab.com/Self-hosted به شبکه و توکن معتبر وابسته است.
+- Full REST backfill of MRs/reviews/pipelines is limited
+- Dedicated review webhook coverage is incomplete
+- Mapping create/edit is primarily via API
+
+Related routes: `/api/gitlab/*` (see Swagger).

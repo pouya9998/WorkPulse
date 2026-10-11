@@ -1,17 +1,23 @@
-# راهنمای اتصال تقویم
+# Calendar and meetings
 
-وضعیت فعلی (فاز ۴):
+Status: **manual meetings implemented in phase 4; OAuth calendar adapters are stubs**
 
-- **Manual adapter**: جلسات ثبت‌شده در WorkPulse از طریق `ManualCalendarAdapter` و `GET /api/meetings/calendar/events` قابل خواندن هستند.
-- **Null adapter**: برای `GOOGLE` / `OUTLOOK` / `NONE` — OAuth واقعی **پیاده‌سازی نشده**؛ registry به adapter خالی متصل است.
-- **`CalendarConnection`**: فیلدهای `token_encrypted` / `refresh_token_encrypted` به‌عنوان placeholder برای اتصال آینده؛ upsert دستی هنگام ایجاد جلسه با provider `MANUAL`.
+## Current capabilities
 
-قوانین فعلی:
+- Manual meeting create / edit / cancel
+- Participants and manual attendance recording
+- Overlap detection against open work sessions
+- Extensible calendar adapter interface
 
-- هم‌پوشانی جلسه با نشست کاری باز: `GET /api/meetings/:id/overlaps` + هشدار `MEETING_CONFLICT` (dedupe روزانه).
-- زمان جلسه در DB به UTC ذخیره می‌شود؛ UI وب برای ایجاد، ورودی UTC (`datetime-local`) دارد.
+## Design goals for future OAuth
 
-کارهای آینده:
+- Adapters for Google Calendar / Microsoft Outlook
+- Encrypted OAuth tokens stored only on the server
+- Avoid double-counting overlapping meeting and work intervals
+- Planned meetings are not automatically treated as productive engineering output
 
-- OAuth Google / Microsoft و sync دوطرفه
-- جلوگیری از duplicate با رویدادهای خارجی پس از sync
+## Limitations
+
+- Google/Outlook OAuth is not live yet (`Null` / `Manual` adapters)
+- Recurrence is not supported
+- Bidirectional external calendar sync is not implemented

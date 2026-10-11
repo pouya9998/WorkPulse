@@ -1,18 +1,18 @@
-# راهنمای توسعه
+# Development guide
 
-## اجرای Dockerized (پیشنهادی)
+## Dockerized run (recommended)
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-نکته: اگر در شِل متغیر `DATABASE_URL` با `localhost` export شده باشد، Compose آن را بر `.env` اولویت می‌دهد و کانتینر API به دیتابیس وصل نمی‌شود. قبل از `docker compose up` آن را `unset` کنید.
+Note: if your shell exports `DATABASE_URL` with `localhost`, Compose prefers that over `.env` and the API container may fail to reach Postgres. `unset DATABASE_URL` before `docker compose up`.
 
-## توسعه محلی API/Web
+## Local API / Web development
 
-1. پورت Postgres در `docker-compose.yml` باز است (`5432`).
-2. برای توسعه خارج از کانتینر:
+1. Postgres port `5432` is exposed in `docker-compose.yml` for local use.
+2. Outside containers:
 
 ```bash
 export DATABASE_URL="postgresql://workpulse:change_me_strong_password@localhost:5432/workpulse?schema=public"
@@ -23,14 +23,19 @@ npm run dev:api
 npm run dev:web
 ```
 
-## تست
+## Tests
 
 ```bash
 npm run test --workspace=@workpulse/api
 
-# e2e دیتابیس را پاک می‌کند — روی محیط توسعه جداگانه اجرا کنید
+# e2e wipes test data — use a disposable database
 export DATABASE_URL="postgresql://workpulse:change_me_strong_password@localhost:5432/workpulse?schema=public"
 npm run test:e2e --workspace=@workpulse/api
-# سپس API را restart کنید تا Bootstrap مدیر دوباره اجرا شود
+# Then restart API if you need bootstrap admin again
 docker compose restart api
 ```
+
+## Documentation language
+
+- Product UI strings: Persian
+- Repository markdown (`README`, `docs/*`, `CONTRIBUTING`): English
