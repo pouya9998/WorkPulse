@@ -116,7 +116,7 @@ WorkPulse برای تیم‌های دورکار نرم‌افزاری طراحی
 ## اجرای سریع با Docker
 
 ```bash
-git clone https://github.com/<OWNER>/WorkPulse.git
+git clone https://github.com/pouya9998/WorkPulse.git
 cd WorkPulse
 cp .env.example .env
 # حتماً POSTGRES_PASSWORD، JWT_SECRET، ENCRYPTION_KEY و رمز مدیر را عوض کنید
