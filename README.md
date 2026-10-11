@@ -42,11 +42,13 @@ WorkPulse helps remote engineering teams manage attendance, device/agent status,
 - Secure bootstrap of the first admin (only when no users exist yet)
 
 ### Attendance and desktop agent
-- Work start / end and heartbeat (default every 60 seconds)
-- Idle and screen-lock detection (best effort on Linux / Windows)
-- Local offline queue with resync
-- Device registration and admin revoke
-- **The agent does not capture screenshots, keystrokes, clipboard, audio, or video**
+- Employees must connect an agent before using the rest of the panel
+- Start / End work from the **web panel** (requires online agent)
+- Heartbeat, idle/lock, foreground app, window title, optional URL/path (best effort)
+- Login auto-start installers (Linux systemd user / Windows task / macOS LaunchAgent)
+- Agents for Linux, Windows, and macOS
+- Local offline queue with resync; device revoke for admins
+- **No screenshots, keystrokes, clipboard, audio, or video**
 
 ### Meetings
 - Manual meeting create/cancel, participants, overlap detection vs work sessions
@@ -192,24 +194,16 @@ Note: if your shell exports `DATABASE_URL=...@localhost`, Compose prefers that o
 
 ## Desktop Agent
 
+**Recommended:** **Devices** → install agent → keep it running → **Attendance** → Start/End work.
+
 ```bash
-cd apps/agent
-make build-linux    # or make build-windows / make build-all
+curl -fsSL http://localhost:4000/api/agent/releases/linux/install-script \
+  | API_BASE=http://localhost:4000/api bash
 
-./bin/workpulse-agent-linux-amd64 login \
-  -api http://localhost:4000/api \
-  -email employee@example.com \
-  -password '********'
-
-./bin/workpulse-agent-linux-amd64 run
-./bin/workpulse-agent-linux-amd64 start-work
-./bin/workpulse-agent-linux-amd64 end-work
-./bin/workpulse-agent-linux-amd64 status
+workpulse-agent   # English prompts for email/password, then runs
 ```
 
-Config: `~/.workpulse/config.json`  
-Offline queue: `~/.workpulse/offline-queue.db`
-
+Agent CLI is English. Work control is panel-only.  
 Full guide: [docs/AGENT.md](docs/AGENT.md)
 
 ---

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { Alert } from '@/components/Alert';
 import { Loading } from '@/components/Loading';
@@ -87,14 +88,33 @@ export default function ReportsPage() {
   return (
     <AppShell userName={userName}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">گزارش‌های مدیریتی</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            نمای کلی سازمان — تولید شده در {formatJalaliDateTime(overview?.generatedAt)}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">گزارش‌های مدیریتی</h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              نمای کلی سازمان — تولید شده در {formatJalaliDateTime(overview?.generatedAt)}
+            </p>
+          </div>
+          <Link href="/reports/activity" className="btn-primary">
+            گزارش فعالیت کاربران
+          </Link>
         </div>
 
         {error ? <Alert type="error">{error}</Alert> : null}
+
+        <div className="card-surface p-5">
+          <h2 className="text-lg font-semibold">فعالیت روزانه هر کاربر</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            برای مدیر و سرپرست: ببینید هر نفر چه برنامه‌هایی باز کرده (مثلاً VS Code روی پروژهٔ
+            prime، سپس Chrome برای جلسه).
+          </p>
+          <Link
+            href="/reports/activity"
+            className="mt-3 inline-flex text-sm font-medium text-brand-700 hover:underline"
+          >
+            مشاهده تایم‌لاین فعالیت →
+          </Link>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[

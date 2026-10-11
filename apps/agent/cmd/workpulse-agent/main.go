@@ -3,43 +3,59 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/workpulse/agent/internal/api"
 	"github.com/workpulse/agent/internal/config"
+	"github.com/workpulse/agent/internal/focus"
 	"github.com/workpulse/agent/internal/idle"
+	"github.com/workpulse/agent/internal/prompt"
 	"github.com/workpulse/agent/internal/queue"
+	"github.com/workpulse/agent/internal/service"
 	"github.com/workpulse/agent/internal/state"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
+	cmd := "run"
+	args := []string{}
+	if len(os.Args) >= 2 {
+		cmd = os.Args[1]
+		args = os.Args[2:]
 	}
 
-	cmd := os.Args[1]
 	switch cmd {
 	case "version", "-version", "--version":
 		fmt.Printf("workpulse-agent %s\n", config.AgentVersion)
 	case "login":
-		runLogin(os.Args[2:])
-	case "start-work":
-		runWorkAction(true)
-	case "end-work":
-		runWorkAction(false)
-	case "run":
+		if err := runLogin(args); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "start-work", "end-work":
+		fmt.Fprintln(os.Stderr, "Start/End work is controlled from the WorkPulse web panel.")
+		fmt.Fprintln(os.Stderr, "Keep this agent running with: workpulse-agent run")
+		os.Exit(1)
+	case "run", "start":
 		runDaemon()
 	case "status":
 		runStatus()
 	case "sync":
 		runSyncOnce()
+	case "service":
+		if err := runService(args); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "help", "-h", "--help":
+		printUsage()
 	default:
 		printUsage()
 		os.Exit(1)
@@ -47,64 +63,135 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`WorkPulse Agent — مدیریت حضور ریموت
+	fmt.Println(`WorkPulse Agent — remote attendance companion
 
-فرمان‌ها:
-  login       ثبت دستگاه با ایمیل/رمز
-  run         اجرای پس‌زمینه (Heartbeat + Idle + همگام‌سازی)
-  start-work  شروع کار
-  end-work    پایان کار
-  sync        همگام‌سازی صف آفلاین
-  status      نمایش وضعیت محلی
-  version     نمایش نسخه
+Commands:
+  run         Start the agent (prompts for email/password if needed)
+  login       Interactive device registration
+  sync        Flush offline queue
+  status      Show local status
+  service     install | uninstall | status  (login auto-start)
+  version     Print version
 
-نمونه:
-  workpulse-agent login -api http://localhost:4000/api -email user@ex.com -password '***'
+Usage:
+  workpulse-agent
   workpulse-agent run
-  workpulse-agent start-work`)
+  workpulse-agent service install
+
+Start and end work from the web panel while this agent stays online.
+The agent reports heartbeat, idle, lock, foreground app, window title,
+and best-effort URL / detail (file path or page title).
+It does not capture screenshots, keystrokes, clipboard, audio, or video.`)
 }
 
-func runLogin(args []string) {
-	fs := flag.NewFlagSet("login", flag.ExitOnError)
-	apiURL := fs.String("api", "http://localhost:4000/api", "آدرس API")
-	email := fs.String("email", "", "ایمیل کاربر")
-	password := fs.String("password", "", "رمز عبور")
-	name := fs.String("name", hostname(), "نام دستگاه")
-	_ = fs.Parse(args)
+func runService(args []string) error {
+	sub := "status"
+	if len(args) > 0 {
+		sub = args[0]
+	}
+	switch sub {
+	case "install":
+		return service.Install()
+	case "uninstall":
+		return service.Uninstall()
+	case "status":
+		msg, err := service.Status()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Auto-start:", msg)
+		return nil
+	default:
+		return fmt.Errorf("usage: workpulse-agent service install|uninstall|status")
+	}
+}
 
-	if *email == "" || *password == "" {
-		fmt.Fprintln(os.Stderr, "email و password الزامی هستند")
-		os.Exit(1)
+func runLogin(args []string) error {
+	fs := flag.NewFlagSet("login", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	apiURL := fs.String("api", "", "API base URL")
+	email := fs.String("email", "", "User email")
+	password := fs.String("password", "", "Password")
+	name := fs.String("name", "", "Device name")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	defaults, _ := config.LoadDefaults()
+	defaultAPI := "http://localhost:4000/api"
+	if defaults != nil && strings.TrimSpace(defaults.APIURL) != "" {
+		defaultAPI = strings.TrimRight(defaults.APIURL, "/")
+	}
+
+	resolvedAPI := strings.TrimSpace(*apiURL)
+	if resolvedAPI == "" {
+		value, err := prompt.Line("API URL", defaultAPI)
+		if err != nil {
+			return err
+		}
+		resolvedAPI = strings.TrimRight(strings.TrimSpace(value), "/")
+	}
+
+	resolvedEmail := strings.TrimSpace(*email)
+	if resolvedEmail == "" {
+		value, err := prompt.Line("Work email", "")
+		if err != nil {
+			return err
+		}
+		resolvedEmail = strings.TrimSpace(value)
+	}
+
+	resolvedPassword := *password
+	if resolvedPassword == "" {
+		value, err := prompt.Password("Password")
+		if err != nil {
+			return err
+		}
+		resolvedPassword = value
+	}
+
+	resolvedName := strings.TrimSpace(*name)
+	if resolvedName == "" {
+		value, err := prompt.Line("Device name", hostname())
+		if err != nil {
+			return err
+		}
+		resolvedName = strings.TrimSpace(value)
+	}
+	if resolvedName == "" {
+		resolvedName = hostname()
+	}
+
+	if resolvedAPI == "" || resolvedEmail == "" || resolvedPassword == "" {
+		return errors.New("API URL, email, and password are required")
 	}
 
 	deviceUID := deviceUID()
-	client := api.New(*apiURL, "")
+	client := api.New(resolvedAPI, "")
 	res, err := client.Register(api.RegisterRequest{
-		Email:        *email,
-		Password:     *password,
+		Email:        resolvedEmail,
+		Password:     resolvedPassword,
 		DeviceUID:    deviceUID,
-		Name:         *name,
+		Name:         resolvedName,
 		Platform:     runtime.GOOS,
 		OSVersion:    runtime.GOARCH,
 		AgentVersion: config.AgentVersion,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ثبت دستگاه ناموفق:", err)
-		os.Exit(1)
+		return fmt.Errorf("device registration failed: %w", err)
 	}
 
 	dataDir, err := config.DefaultDataDir()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
 	cfg := &config.Config{
-		APIURL:         *apiURL,
+		APIURL:         resolvedAPI,
 		DeviceToken:    res.DeviceToken,
 		DeviceID:       res.DeviceID,
 		DeviceUID:      res.DeviceUID,
-		DeviceName:     *name,
+		DeviceName:     resolvedName,
 		UserID:         res.UserID,
 		OrganizationID: res.OrganizationID,
 		HeartbeatSec:   res.HeartbeatIntervalSeconds,
@@ -113,83 +200,56 @@ func runLogin(args []string) {
 	}
 	path, _ := config.DefaultPath()
 	if err := cfg.Save(path); err != nil {
-		fmt.Fprintln(os.Stderr, "ذخیره تنظیمات ناموفق:", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to save config: %w", err)
 	}
+	_ = config.SaveDefaults(&config.Defaults{APIURL: resolvedAPI})
 
-	fmt.Println("دستگاه با موفقیت ثبت شد.")
-	fmt.Println("شناسه دستگاه:", res.DeviceID)
-	fmt.Println("فایل تنظیمات:", path)
-	fmt.Println("هشدار: توکن دستگاه فقط در همین فایل محلی ذخیره می‌شود.")
+	fmt.Println("Login successful — device registered.")
+	fmt.Println("Device ID:", res.DeviceID)
+	fmt.Println("Config file:", path)
+	fmt.Println("Keep the agent running, then Start/End work from the web panel.")
+	return nil
 }
 
-func runWorkAction(start bool) {
-	cfg, q, client := mustReady()
-	defer q.Close()
-
-	rt := &state.Runtime{}
-	eventType := "WORK_END"
-	prefix := "wend"
-	if start {
-		eventType = "WORK_START"
-		prefix = "wstart"
+func ensureLoggedIn() error {
+	cfg, err := loadConfig()
+	if err == nil && cfg.RequireAuth() == nil {
+		return nil
 	}
-
-	clientEventID := queue.NewClientEventID(prefix)
-	occurred := time.Now().UTC().Format(time.RFC3339)
-	seq := rt.NextSequence()
-
-	if err := q.Enqueue(clientEventID, eventType, occurred, seq, ""); err != nil {
-		fmt.Fprintln(os.Stderr, "صف محلی:", err)
-		os.Exit(1)
-	}
-
-	req := api.WorkRequest{ClientEventID: clientEventID, OccurredAtDevice: occurred}
-	var err error
-	if start {
-		err = client.StartWork(req)
-	} else {
-		err = client.EndWork(req)
-	}
-
-	if err != nil {
-		fmt.Println("ارتباط برقرار نشد؛ رویداد در صف آفلاین ذخیره شد:", err)
-		fmt.Printf("نوع رویداد: %s | دستگاه: %s\n", eventType, cfg.DeviceName)
-		os.Exit(0)
-	}
-
-	// در صورت موفقیت مستقیم، صف را هم خالی می‌کنیم
-	_ = flushQueue(client, q)
-	if start {
-		fmt.Println("شروع کار ثبت شد.")
-	} else {
-		fmt.Println("پایان کار ثبت شد.")
-	}
+	fmt.Println("Sign in with your WorkPulse account to start the agent.")
+	return runLogin(nil)
 }
 
 func runDaemon() {
+	if err := ensureLoggedIn(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	cfg, q, client := mustReady()
 	defer q.Close()
 
 	rt := &state.Runtime{Working: true, Connected: true}
-	fmt.Printf("WorkPulse Agent %s در حال اجرا...\n", config.AgentVersion)
-	fmt.Printf("API: %s | دستگاه: %s | Heartbeat: %ds\n", cfg.APIURL, cfg.DeviceName, cfg.HeartbeatSec)
-	fmt.Println("این Agent اسکرین‌شات، کلید، Clipboard یا صدا ضبط نمی‌کند.")
+	fmt.Printf("WorkPulse Agent %s running...\n", config.AgentVersion)
+	fmt.Printf("API: %s | Device: %s | Heartbeat: %ds\n", cfg.APIURL, cfg.DeviceName, cfg.HeartbeatSec)
+	fmt.Println("Privacy: no screenshots, keystrokes, clipboard, audio, or video.")
+	fmt.Println("Reports app name, window title, optional URL/path detail.")
+	fmt.Println("Start/End work from the WorkPulse web panel.")
 
-	// رویداد آنلاین
 	_ = enqueueAndTry(client, q, rt, "AGENT_ONLINE", "")
 
 	ticker := time.NewTicker(time.Duration(cfg.HeartbeatSec) * time.Second)
 	syncTicker := time.NewTicker(15 * time.Second)
 	idleTicker := time.NewTicker(10 * time.Second)
+	focusTicker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	defer syncTicker.Stop()
 	defer idleTicker.Stop()
+	defer focusTicker.Stop()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	// اولین heartbeat فوری
+	var lastFocusKey string
 	sendHeartbeat(client, q, rt, cfg)
 
 	for {
@@ -207,9 +267,16 @@ func runDaemon() {
 			}
 		case <-idleTicker.C:
 			handleIdleLock(client, q, rt, cfg)
+		case <-focusTicker.C:
+			info, _ := focus.Foreground()
+			key := info.ProcessName + "|" + info.AppName + "|" + info.URL + "|" + info.Detail
+			if key != "|||" && key != lastFocusKey {
+				lastFocusKey = key
+				sendHeartbeat(client, q, rt, cfg)
+			}
 		case <-stop:
 			_ = enqueueAndTry(client, q, rt, "AGENT_OFFLINE", "")
-			fmt.Println("\nAgent متوقف شد.")
+			fmt.Println("\nAgent stopped.")
 			return
 		}
 	}
@@ -230,31 +297,47 @@ func runStatus() {
 	pending, _ := q.PendingCount()
 	idleSec, _ := idle.IdleSeconds()
 	locked, _ := idle.IsScreenLocked()
+	app, _ := focus.Foreground()
 
-	fmt.Println("وضعیت Agent")
-	fmt.Println("  نسخه:        ", config.AgentVersion)
+	fmt.Println("Agent status")
+	fmt.Println("  Version:     ", config.AgentVersion)
 	fmt.Println("  API:         ", cfg.APIURL)
-	fmt.Println("  دستگاه:      ", cfg.DeviceName)
-	fmt.Println("  پلتفرم:      ", runtime.GOOS)
-	fmt.Println("  صف آفلاین:   ", pending)
-	fmt.Println("  Idle (ثانیه):", idleSec)
-	fmt.Println("  قفل صفحه:    ", locked)
+	fmt.Println("  Device:      ", cfg.DeviceName)
+	fmt.Println("  Platform:    ", runtime.GOOS)
+	fmt.Println("  Offline queue:", pending)
+	fmt.Println("  Idle (sec):  ", idleSec)
+	fmt.Println("  Screen lock: ", locked)
+	fmt.Println("  Focused app: ", app.AppName, "("+app.ProcessName+")")
+	if app.WindowTitle != "" {
+		fmt.Println("  Window title:", truncate(app.WindowTitle, 120))
+	}
+	if app.Detail != "" {
+		fmt.Println("  Detail:      ", truncate(app.Detail, 120))
+	}
+	if app.URL != "" {
+		fmt.Println("  URL:         ", truncate(app.URL, 200))
+	}
 }
 
 func runSyncOnce() {
+	if err := ensureLoggedIn(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	_, q, client := mustReady()
 	defer q.Close()
 	if err := flushQueue(client, q); err != nil {
-		fmt.Fprintln(os.Stderr, "همگام‌سازی ناموفق:", err)
+		fmt.Fprintln(os.Stderr, "sync failed:", err)
 		os.Exit(1)
 	}
 	pending, _ := q.PendingCount()
-	fmt.Println("همگام‌سازی انجام شد. باقیمانده صف:", pending)
+	fmt.Println("Sync complete. Pending queue:", pending)
 }
 
 func sendHeartbeat(client *api.Client, q *queue.Queue, rt *state.Runtime, cfg *config.Config) {
 	idleSec, _ := idle.IdleSeconds()
 	locked, _ := idle.IsScreenLocked()
+	app, _ := focus.Foreground()
 	id := queue.NewClientEventID("hb")
 	now := time.Now().UTC().Format(time.RFC3339)
 	req := api.HeartbeatRequest{
@@ -264,8 +347,21 @@ func sendHeartbeat(client *api.Client, q *queue.Queue, rt *state.Runtime, cfg *c
 		IsLocked:      locked,
 		AgentVersion:  config.AgentVersion,
 	}
+	if app.ProcessName != "" || app.AppName != "" {
+		req.FocusedApp = &api.FocusedApp{
+			ProcessName: app.ProcessName,
+			AppName:     app.AppName,
+			WindowTitle: truncate(app.WindowTitle, 300),
+			URL:         truncate(app.URL, 1000),
+			Detail:      truncate(app.Detail, 300),
+		}
+	}
 	if err := client.Heartbeat(req); err != nil {
-		_ = q.Enqueue(id, "HEARTBEAT", now, rt.NextSequence(), fmt.Sprintf(`{"idleSeconds":%d,"isLocked":%v}`, idleSec, locked))
+		payload := fmt.Sprintf(
+			`{"idleSeconds":%d,"isLocked":%v,"processName":%q,"appName":%q}`,
+			idleSec, locked, app.ProcessName, app.AppName,
+		)
+		_ = q.Enqueue(id, "HEARTBEAT", now, rt.NextSequence(), payload)
 		pending, _ := q.PendingCount()
 		rt.SetSyncMeta(pending, false, err.Error())
 		return
@@ -316,7 +412,6 @@ func flushQueue(client *api.Client, q *queue.Queue) error {
 		return nil
 	}
 
-	// Heartbeatهای صف‌شده را جدا از sync رویدادهای حضور ارسال می‌کنیم
 	var attendance []queue.PendingEvent
 	var hbIDs []int64
 	for _, p := range pending {
@@ -360,11 +455,11 @@ func flushQueue(client *api.Client, q *queue.Queue) error {
 func printStatusLine(rt *state.Runtime, q *queue.Queue) {
 	snap := rt.Snapshot()
 	pending, _ := q.PendingCount()
-	conn := "آنلاین"
+	conn := "online"
 	if !snap.Connected {
-		conn = "آفلاین"
+		conn = "offline"
 	}
-	fmt.Printf("[%s] اتصال=%s | صف=%d | Idle=%v | قفل=%v\n",
+	fmt.Printf("[%s] connection=%s | queue=%d | idle=%v | locked=%v\n",
 		time.Now().Format("15:04:05"), conn, pending, snap.LastIdle, snap.LastLocked)
 }
 
@@ -406,4 +501,11 @@ func hostname() string {
 func deviceUID() string {
 	h := sha256.Sum256([]byte(hostname() + "|" + runtime.GOOS + "|" + runtime.GOARCH))
 	return hex.EncodeToString(h[:])
+}
+
+func truncate(s string, n int) string {
+	if n <= 0 || len(s) <= n {
+		return s
+	}
+	return s[:n]
 }

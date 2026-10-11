@@ -168,6 +168,7 @@ model User {
   attendanceEvents AttendanceEvent[]
   heartbeats   HeartbeatEvent[]
   deviceStates DeviceStateInterval[]
+  appFocusIntervals AppFocusInterval[]
   gitlabUserMappings GitLabUserMapping[]
   mergeRequests MergeRequest[]
   reviews      Review[]
@@ -311,6 +312,7 @@ model RegisteredDevice {
   events       AttendanceEvent[]
   heartbeats   HeartbeatEvent[]
   stateIntervals DeviceStateInterval[]
+  appFocusIntervals AppFocusInterval[]
 
   @@unique([organizationId, deviceUid])
   @@index([userId, status])
@@ -386,6 +388,11 @@ model HeartbeatEvent {
   idleSeconds     Int?     @map("idle_seconds")
   isLocked        Boolean  @default(false) @map("is_locked")
   agentVersion    String?  @map("agent_version")
+  focusedProcess  String?  @map("focused_process")
+  focusedApp      String?  @map("focused_app")
+  focusedWindowTitle String? @map("focused_window_title")
+  focusedUrl      String?  @map("focused_url")
+  focusedDetail   String?  @map("focused_detail")
   createdAt       DateTime @default(now()) @map("created_at")
 
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -396,6 +403,28 @@ model HeartbeatEvent {
   @@index([deviceId, receivedAtServer])
   @@index([userId, receivedAtServer])
   @@map("heartbeat_events")
+}
+
+model AppFocusInterval {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  deviceId      String    @map("device_id")
+  processName   String    @map("process_name")
+  appName       String    @map("app_name")
+  windowTitle   String?   @map("window_title")
+  url           String?
+  detail        String?
+  startedAt     DateTime  @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device RegisteredDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([deviceId, endedAt])
+  @@map("app_focus_intervals")
 }
 
 model DeviceStateInterval {

@@ -61,12 +61,21 @@ type SyncResponse struct {
 	ServerTime string `json:"serverTime"`
 }
 
+type FocusedApp struct {
+	ProcessName string `json:"processName,omitempty"`
+	AppName     string `json:"appName,omitempty"`
+	WindowTitle string `json:"windowTitle,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Detail      string `json:"detail,omitempty"`
+}
+
 type HeartbeatRequest struct {
-	ClientEventID string `json:"clientEventId"`
-	SentAtDevice  string `json:"sentAtDevice"`
-	IdleSeconds   *int   `json:"idleSeconds,omitempty"`
-	IsLocked      bool   `json:"isLocked"`
-	AgentVersion  string `json:"agentVersion,omitempty"`
+	ClientEventID string      `json:"clientEventId"`
+	SentAtDevice  string      `json:"sentAtDevice"`
+	IdleSeconds   *int        `json:"idleSeconds,omitempty"`
+	IsLocked      bool        `json:"isLocked"`
+	AgentVersion  string      `json:"agentVersion,omitempty"`
+	FocusedApp    *FocusedApp `json:"focusedApp,omitempty"`
 }
 
 type WorkRequest struct {

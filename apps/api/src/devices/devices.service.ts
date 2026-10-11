@@ -48,12 +48,15 @@ export class DevicesService {
 
     let device;
     if (existing) {
-      if (existing.userId !== user.id) {
+      // Active device owned by someone else cannot be stolen.
+      // Revoked devices can be reclaimed by a new login on the same machine.
+      if (existing.userId !== user.id && existing.status !== 'REVOKED') {
         throw new ForbiddenException('این دستگاه به کاربر دیگری متصل است');
       }
       device = await this.prisma.registeredDevice.update({
         where: { id: existing.id },
         data: {
+          userId: user.id,
           name: dto.name,
           platform: dto.platform,
           osVersion: dto.osVersion,
@@ -199,5 +202,32 @@ export class DevicesService {
         ...(heartbeat ? { lastHeartbeatAt: new Date() } : {}),
       },
     });
+  }
+
+  async meStatus(actor: AuthUser) {
+    const device = await this.prisma.registeredDevice.findFirst({
+      where: { userId: actor.id, status: 'ACTIVE' },
+      orderBy: { lastHeartbeatAt: 'desc' },
+    });
+    const now = Date.now();
+    const isOnline = !!(
+      device?.lastHeartbeatAt &&
+      now - device.lastHeartbeatAt.getTime() < HEARTBEAT_STALE_MS
+    );
+    const canBypassGate =
+      actor.permissions.includes('users:write') ||
+      actor.roles.includes('SUPER_ADMIN') ||
+      actor.roles.includes('ORGANIZATION_ADMIN');
+
+    return {
+      hasDevice: !!device,
+      isOnline,
+      deviceId: device?.id ?? null,
+      deviceName: device?.name ?? null,
+      lastHeartbeatAt: device?.lastHeartbeatAt ?? null,
+      agentVersion: device?.agentVersion ?? null,
+      canBypassGate,
+      panelUnlocked: isOnline || canBypassGate,
+    };
   }
 }

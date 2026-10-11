@@ -36,9 +36,10 @@ coverage/
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
 
-# Agent binaries
+# Agent binaries / release artifacts
 apps/agent/bin/
 apps/agent/dist/
+apps/agent/releases/
 
 # Docker
 *.pem

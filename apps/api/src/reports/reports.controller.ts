@@ -1,5 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -30,6 +36,31 @@ export class ReportsController {
     @Query('to') to?: string,
   ) {
     return this.reports.attendanceSummary(user, from, to);
+  }
+
+  @Get('activity')
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_MANAGE)
+  @ApiOperation({
+    summary: 'گزارش فعالیت روزانه کاربر (برنامه‌های فعال / تایم‌لاین)',
+  })
+  @ApiQuery({ name: 'userId', required: true })
+  @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD در منطقه زمانی سازمان' })
+  activity(
+    @CurrentUser() user: AuthUser,
+    @Query('userId') userId?: string,
+    @Query('date') date?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!userId?.trim()) {
+      throw new BadRequestException('userId الزامی است');
+    }
+    return this.reports.activityTimeline(user, {
+      userId: userId.trim(),
+      date,
+      from,
+      to,
+    });
   }
 
   @Get('audit-export')

@@ -20,6 +20,7 @@ Allowed data:
 - Work start / end events
 - Heartbeat and connectivity state
 - Idle and screen lock (on supported OS APIs)
+- Foreground app name, window title, and best-effort URL / path detail
 - Agent version and device identifier
 
 ## HTTP hardening

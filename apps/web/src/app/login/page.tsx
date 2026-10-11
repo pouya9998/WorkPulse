@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       const data = await apiFetch<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       });
       setToken(data.accessToken);
       router.replace('/dashboard');

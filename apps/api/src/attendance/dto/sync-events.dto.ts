@@ -11,6 +11,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
@@ -51,6 +52,38 @@ export class SyncEventsDto {
   events!: SyncEventItemDto[];
 }
 
+export class FocusedAppDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  processName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  appName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  windowTitle?: string;
+
+  @ApiPropertyOptional({ description: 'Best-effort active browser URL' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  url?: string;
+
+  @ApiPropertyOptional({ description: 'Normalized title / file path / media title' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  detail?: string;
+}
+
 export class HeartbeatDto {
   @ApiProperty()
   @IsString()
@@ -76,6 +109,12 @@ export class HeartbeatDto {
   @IsOptional()
   @IsString()
   agentVersion?: string;
+
+  @ApiPropertyOptional({ type: FocusedAppDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FocusedAppDto)
+  focusedApp?: FocusedAppDto;
 }
 
 export class WorkActionDto {

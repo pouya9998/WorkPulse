@@ -1,85 +1,112 @@
 # Desktop Agent guide
 
-Current agent version: **0.2.0** (phase 2)
+Current agent version: **0.4.0**
 
-## Implemented
+## Role
 
-- Device registration with user email/password (`login`)
-- Work start / end (`start-work` / `end-work`)
-- Heartbeat every 60 seconds by default (`run`)
-- Idle and screen-lock detection on Linux/Windows (best effort)
-- Local SQLite offline queue and resync (`sync` / `run` loop)
-- Connection status and queue size display
-- Device access revoke from web/API
+The agent stays online on the employee machine. **Start / End work is done in the web panel**, not from the agent CLI.
 
-## Not collected by the agent
+The agent reports:
 
-- Screenshots
-- Keystrokes
-- Clipboard
-- Audio or video
+- Heartbeat
+- Idle / screen lock (best effort)
+- Foreground application name
+- Window title (up to ~300 chars)
+- Best-effort **URL** (browser address bar / AppleScript / accessibility)
+- **Detail** (normalized page title, file path, or media title)
 
-## Build
+It does **not** capture screenshots, keystrokes, clipboard, audio, or video.
 
-Prerequisite: Go 1.22+
+## Language
+
+All agent CLI messages are **English**.
+
+## Download from the panel
+
+| Path | Description |
+|------|-------------|
+| `GET /api/agent/releases` | List builds |
+| `GET /api/agent/releases/linux/download` | Linux amd64 binary |
+| `GET /api/agent/releases/windows/download` | Windows amd64 binary |
+| `GET /api/agent/releases/macos/download` | macOS Intel binary |
+| `GET /api/agent/releases/macos-arm64/download` | macOS Apple Silicon binary |
+| `GET /api/agent/releases/:platform/install-script` | Installer |
+
+In the UI: **Devices** → install → run agent → when online, use **Attendance** → Start/End work.
+
+```bash
+# Linux install (enables login auto-start by default)
+curl -fsSL http://localhost:4000/api/agent/releases/linux/install-script \
+  | API_BASE=http://localhost:4000/api bash
+
+# macOS (auto-selects amd64 / arm64)
+curl -fsSL http://localhost:4000/api/agent/releases/macos/install-script \
+  | API_BASE=http://localhost:4000/api bash
+
+# Start (prompts for email/password in English)
+workpulse-agent
+```
+
+```powershell
+$env:API_BASE='http://localhost:4000/api'
+irm http://localhost:4000/api/agent/releases/windows/install-script | iex
+workpulse-agent
+```
+
+Set `INSTALL_SERVICE=0` to skip auto-start during install.
+
+## Build from source
 
 ```bash
 cd apps/agent
-make build-linux
-make build-windows
-# or
-make build-all
+make prepare-releases   # linux + windows + macos binaries + install scripts + manifest
 ```
 
-Output: `apps/agent/bin/`
+## Commands
 
-## Usage
+| Command | Purpose |
+|---------|---------|
+| `workpulse-agent` / `run` | Login if needed, then run heartbeat loop |
+| `login` | Interactive registration |
+| `status` | Local status including focused app / URL |
+| `sync` | Flush offline queue |
+| `service install` | Enable login auto-start |
+| `service uninstall` | Disable login auto-start |
+| `service status` | Show auto-start status |
+| `start-work` / `end-work` | Disabled — use the web panel |
 
-```bash
-# Register device
-./bin/workpulse-agent-linux-amd64 login \
-  -api http://localhost:4000/api \
-  -email employee@example.com \
-  -password '********' \
-  -name "Work laptop"
+## Auto-start
 
-# Background loop
-./bin/workpulse-agent-linux-amd64 run
-
-# Work start / end
-./bin/workpulse-agent-linux-amd64 start-work
-./bin/workpulse-agent-linux-amd64 end-work
-
-# Local status
-./bin/workpulse-agent-linux-amd64 status
-```
-
-Settings are stored in `~/.workpulse/config.json`.  
-Offline queue is stored in `~/.workpulse/offline-queue.db`.
-
-## Platform notes
-
-### Linux
-- Idle: via `xprintidle` when available
-- Lock: via `loginctl LockedHint` when session APIs are available
-- No root required
-
-### Windows
-- Idle: `GetLastInputInfo`
-- Lock: input-desktop accessibility check
-
-If OS APIs are unavailable, the agent still runs and reports idle/lock as `0` / `false`.
+| OS | Mechanism |
+|----|-----------|
+| Linux | User systemd unit `~/.config/systemd/user/workpulse-agent.service` |
+| Windows | Logon scheduled task (or Startup shortcut fallback) |
+| macOS | LaunchAgent `~/Library/LaunchAgents/com.workpulse.agent.plist` |
 
 ## Related APIs
 
 | Path | Description |
-|------|--------|
+|------|-------------|
 | `POST /api/agent/register` | Register device |
-| `POST /api/agent/work/start` | Start work |
-| `POST /api/agent/work/end` | End work |
-| `POST /api/agent/heartbeat` | Heartbeat |
-| `POST /api/agent/events/sync` | Batch sync |
+| `POST /api/agent/heartbeat` | Heartbeat (+ focused app / url / detail) |
+| `POST /api/agent/events/sync` | Offline sync |
+| `POST /api/attendance/work/start` | Start work (JWT, requires online agent) |
+| `POST /api/attendance/work/end` | End work (JWT, requires online agent) |
+| `GET /api/devices/me/status` | Panel unlock status |
 | `GET /api/devices` | List devices |
-| `POST /api/devices/:id/revoke` | Revoke device |
-| `GET /api/attendance/status` | Attendance status |
-| `GET /api/attendance/timeline` | Timeline |
+
+## Platform notes
+
+### Linux
+- Idle: `xprintidle` when available
+- Focus: `xdotool` / `xprop` + `/proc`
+- URL: best-effort AT-SPI via optional Python/gi
+
+### Windows
+- Idle: `GetLastInputInfo`
+- Focus: `GetForegroundWindow` + process image name
+- URL: best-effort UI Automation (Chrome/Edge address bar)
+
+### macOS
+- Idle: `ioreg` HIDIdleTime
+- Focus / URL: AppleScript for frontmost app and Safari/Chrome/Edge/Firefox

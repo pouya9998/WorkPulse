@@ -12,6 +12,7 @@ import { RolesModule } from './roles/roles.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { UsersModule } from './users/users.module';
 import { DevicesModule } from './devices/devices.module';
+import { AgentReleasesModule } from './agent-releases/agent-releases.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GitLabModule } from './gitlab/gitlab.module';
 import { PayrollModule } from './payroll/payroll.module';
@@ -43,6 +44,7 @@ import { SettingsModule } from './settings/settings.module';
     RolesModule,
     UsersModule,
     DevicesModule,
+    AgentReleasesModule,
     AttendanceModule,
     GitLabModule,
     PayrollModule,

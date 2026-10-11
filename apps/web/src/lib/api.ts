@@ -42,7 +42,6 @@ export async function apiFetch<T>(
   let body: BodyInit | undefined;
   if (options.body != null) {
     if (
-      typeof options.body === 'string' ||
       options.body instanceof FormData ||
       options.body instanceof URLSearchParams ||
       options.body instanceof Blob ||
@@ -50,6 +49,12 @@ export async function apiFetch<T>(
       ArrayBuffer.isView(options.body)
     ) {
       body = options.body as BodyInit;
+    } else if (typeof options.body === 'string') {
+      // Callers often pass JSON.stringify(...); Nest needs the JSON content-type.
+      if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      body = options.body;
     } else {
       if (!headers.has('Content-Type')) {
         headers.set('Content-Type', 'application/json');

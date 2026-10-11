@@ -1,3 +1,12 @@
+# --- Desktop agent release artifacts (Linux + Windows + macOS) ---
+FROM golang:1.22-bookworm AS agent-releases
+WORKDIR /src
+COPY apps/agent/go.mod apps/agent/go.sum ./
+RUN go mod download
+COPY apps/agent/ ./
+RUN make prepare-releases RELEASES_DIR=/out/agent-releases
+
+# --- API deps ---
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl
@@ -21,11 +30,13 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache openssl wget
 ENV NODE_ENV=production
+ENV AGENT_RELEASES_DIR=/app/agent-releases
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/package.json ./package.json
+COPY --from=agent-releases /out/agent-releases ./agent-releases
 COPY infra/docker/api-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 WORKDIR /app/apps/api

@@ -47,6 +47,7 @@ services:
       BOOTSTRAP_ORG_NAME: ${BOOTSTRAP_ORG_NAME:-سازمان نمونه}
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Tehran}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      AGENT_RELEASES_DIR: ${AGENT_RELEASES_DIR:-/app/agent-releases}
     ports:
       - "${API_PORT:-4000}:4000"
     networks:

@@ -22,6 +22,15 @@ export class DevicesController {
     return this.devices.register(dto, req.ip);
   }
 
+  @Get('devices/me/status')
+  @ApiBearerAuth()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_READ)
+  @ApiOperation({ summary: 'وضعیت Agent کاربر جاری برای قفل پنل' })
+  meStatus(@CurrentUser() user: AuthUser) {
+    return this.devices.meStatus(user);
+  }
+
   @Get('devices')
   @ApiBearerAuth()
   @UseGuards(PermissionsGuard)

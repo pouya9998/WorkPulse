@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import {
   AttendanceEventType,
   DeviceStateType,
@@ -37,6 +38,25 @@ export class AttendanceService {
     return this.applyWorkAction(device, dto, 'WORK_END', ip);
   }
 
+  /** Panel-triggered work action (JWT). Requires caller's agent to be online. */
+  async startWorkForUser(actor: AuthUser, ip?: string) {
+    const device = await this.requireOnlineDeviceContext(actor);
+    const dto: WorkActionDto = {
+      clientEventId: `panel-start-${randomUUID()}`,
+      occurredAtDevice: new Date().toISOString(),
+    };
+    return this.applyWorkAction(device, dto, 'WORK_START', ip);
+  }
+
+  async endWorkForUser(actor: AuthUser, ip?: string) {
+    const device = await this.requireOnlineDeviceContext(actor);
+    const dto: WorkActionDto = {
+      clientEventId: `panel-end-${randomUUID()}`,
+      occurredAtDevice: new Date().toISOString(),
+    };
+    return this.applyWorkAction(device, dto, 'WORK_END', ip);
+  }
+
   async heartbeat(device: DeviceAuthContext, dto: HeartbeatDto, ip?: string) {
     const existing = await this.prisma.heartbeatEvent.findUnique({
       where: {
@@ -55,6 +75,12 @@ export class AttendanceService {
       orderBy: { startedAt: 'desc' },
     });
 
+    const focusedProcess = dto.focusedApp?.processName?.trim() || null;
+    const focusedApp = dto.focusedApp?.appName?.trim() || focusedProcess;
+    const focusedWindowTitle = dto.focusedApp?.windowTitle?.trim()?.slice(0, 300) || null;
+    const focusedUrl = dto.focusedApp?.url?.trim()?.slice(0, 1000) || null;
+    const focusedDetail = dto.focusedApp?.detail?.trim()?.slice(0, 300) || null;
+
     const hb = await this.prisma.heartbeatEvent.create({
       data: {
         userId: device.userId,
@@ -65,6 +91,11 @@ export class AttendanceService {
         idleSeconds: dto.idleSeconds,
         isLocked: dto.isLocked ?? false,
         agentVersion: dto.agentVersion || device.agentVersion,
+        focusedProcess,
+        focusedApp,
+        focusedWindowTitle,
+        focusedUrl,
+        focusedDetail,
       },
     });
 
@@ -77,9 +108,20 @@ export class AttendanceService {
       });
     }
 
-    // به‌روزرسانی وضعیت دستگاه بر اساس Idle/Lock
     const nextState = this.resolveState(dto.idleSeconds, dto.isLocked);
     await this.transitionState(device, openSession?.id ?? null, nextState, hb.id);
+
+    if (focusedApp || focusedProcess) {
+      await this.upsertAppFocus(
+        device,
+        focusedProcess || focusedApp || 'unknown',
+        focusedApp || focusedProcess || 'unknown',
+        focusedWindowTitle,
+        focusedUrl,
+        focusedDetail,
+        new Date(dto.sentAtDevice),
+      );
+    }
 
     await this.prisma.attendanceEvent.create({
       data: {
@@ -93,6 +135,10 @@ export class AttendanceService {
         payload: {
           idleSeconds: dto.idleSeconds ?? null,
           isLocked: dto.isLocked ?? false,
+          focusedApp,
+          focusedProcess,
+          focusedUrl,
+          focusedDetail,
         },
       },
     }).catch(async (err) => {
@@ -145,29 +191,45 @@ export class AttendanceService {
     const targetId = userId || actor.id;
     await this.assertCanView(actor, targetId);
 
-    const [openSession, device, recentEvents, openState] = await Promise.all([
-      this.prisma.workSession.findFirst({
-        where: { userId: targetId, status: 'OPEN' },
-        orderBy: { startedAt: 'desc' },
-        include: { device: true },
-      }),
-      this.prisma.registeredDevice.findFirst({
-        where: { userId: targetId, status: 'ACTIVE' },
-        orderBy: { lastHeartbeatAt: 'desc' },
-      }),
-      this.prisma.attendanceEvent.findMany({
-        where: {
-          userId: targetId,
-          type: { not: 'HEARTBEAT' },
-        },
-        orderBy: { occurredAtDevice: 'desc' },
-        take: 30,
-      }),
-      this.prisma.deviceStateInterval.findFirst({
-        where: { userId: targetId, endedAt: null },
-        orderBy: { startedAt: 'desc' },
-      }),
-    ]);
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+
+    const [openSession, device, recentEvents, openState, latestHb, appFocus] =
+      await Promise.all([
+        this.prisma.workSession.findFirst({
+          where: { userId: targetId, status: 'OPEN' },
+          orderBy: { startedAt: 'desc' },
+          include: { device: true },
+        }),
+        this.prisma.registeredDevice.findFirst({
+          where: { userId: targetId, status: 'ACTIVE' },
+          orderBy: { lastHeartbeatAt: 'desc' },
+        }),
+        this.prisma.attendanceEvent.findMany({
+          where: {
+            userId: targetId,
+            type: { not: 'HEARTBEAT' },
+          },
+          orderBy: { occurredAtDevice: 'desc' },
+          take: 30,
+        }),
+        this.prisma.deviceStateInterval.findFirst({
+          where: { userId: targetId, endedAt: null },
+          orderBy: { startedAt: 'desc' },
+        }),
+        this.prisma.heartbeatEvent.findFirst({
+          where: { userId: targetId },
+          orderBy: { receivedAtServer: 'desc' },
+        }),
+        this.prisma.appFocusInterval.findMany({
+          where: {
+            userId: targetId,
+            startedAt: { gte: dayStart },
+          },
+          orderBy: { startedAt: 'desc' },
+          take: 40,
+        }),
+      ]);
 
     const now = Date.now();
     const heartbeatFresh = !!(
@@ -205,6 +267,28 @@ export class AttendanceService {
           }
         : null,
       currentState: openState?.state ?? 'UNKNOWN',
+      focusedApp: latestHb?.focusedApp
+        ? {
+            appName: latestHb.focusedApp,
+            processName: latestHb.focusedProcess,
+            windowTitle: latestHb.focusedWindowTitle,
+            url: latestHb.focusedUrl,
+            detail: latestHb.focusedDetail,
+            at: latestHb.receivedAtServer,
+          }
+        : null,
+      appFocusToday: appFocus.map((a) => ({
+        id: a.id,
+        appName: a.appName,
+        processName: a.processName,
+        windowTitle: a.windowTitle,
+        url: a.url,
+        detail: a.detail,
+        startedAt: a.startedAt,
+        endedAt: a.endedAt,
+      })),
+      canStartWork: heartbeatFresh && !openSession,
+      canEndWork: heartbeatFresh && !!openSession,
       recentEvents: recentEvents.map((e) => ({
         id: e.id,
         type: e.type,
@@ -216,6 +300,7 @@ export class AttendanceService {
       notes: [
         'قطع Heartbeat به‌تنهایی اثبات غیبت نیست.',
         'متصل بودن Agent به‌معنای کار مفید نیست.',
+        'شروع و پایان کار فقط از پنل وب و با Agent آنلاین امکان‌پذیر است.',
       ],
     };
   }
@@ -574,6 +659,87 @@ export class AttendanceService {
       default:
         return null;
     }
+  }
+
+  private async requireOnlineDeviceContext(actor: AuthUser): Promise<DeviceAuthContext> {
+    const device = await this.prisma.registeredDevice.findFirst({
+      where: { userId: actor.id, status: 'ACTIVE' },
+      orderBy: { lastHeartbeatAt: 'desc' },
+    });
+    if (!device?.lastHeartbeatAt) {
+      throw new ForbiddenException('Agent آنلاین نیست. ابتدا Agent را نصب و اجرا کنید.');
+    }
+    const fresh =
+      Date.now() - device.lastHeartbeatAt.getTime() < HEARTBEAT_STALE_MS;
+    if (!fresh) {
+      throw new ForbiddenException('Agent آنلاین نیست. Agent باید در حال اجرا باشد.');
+    }
+    return {
+      deviceId: device.id,
+      userId: device.userId,
+      organizationId: device.organizationId,
+      deviceUid: device.deviceUid,
+      agentVersion: device.agentVersion,
+      platform: device.platform,
+    };
+  }
+
+  private async upsertAppFocus(
+    device: DeviceAuthContext,
+    processName: string,
+    appName: string,
+    windowTitle: string | null,
+    url: string | null,
+    detail: string | null,
+    at: Date,
+  ) {
+    const open = await this.prisma.appFocusInterval.findFirst({
+      where: { deviceId: device.deviceId, endedAt: null },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    if (
+      open &&
+      open.processName === processName &&
+      open.appName === appName
+    ) {
+      const patch: {
+        windowTitle?: string;
+        url?: string | null;
+        detail?: string | null;
+      } = {};
+      if (windowTitle && windowTitle !== open.windowTitle) patch.windowTitle = windowTitle;
+      if (url !== undefined && url !== open.url) patch.url = url;
+      if (detail !== undefined && detail !== open.detail) patch.detail = detail;
+      if (Object.keys(patch).length > 0) {
+        await this.prisma.appFocusInterval.update({
+          where: { id: open.id },
+          data: patch,
+        });
+      }
+      return;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (open) {
+        await tx.appFocusInterval.update({
+          where: { id: open.id },
+          data: { endedAt: at },
+        });
+      }
+      await tx.appFocusInterval.create({
+        data: {
+          userId: device.userId,
+          deviceId: device.deviceId,
+          processName,
+          appName,
+          windowTitle: windowTitle ?? undefined,
+          url: url ?? undefined,
+          detail: detail ?? undefined,
+          startedAt: at,
+        },
+      });
+    });
   }
 
   private async assertCanView(actor: AuthUser, targetUserId: string) {

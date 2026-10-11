@@ -29,8 +29,8 @@ Agent header: `X-Device-Token`
 
 | Area | Main routes |
 |------|----------------|
-| Agent / devices | `/api/agent/*`, `/api/devices` |
-| Attendance | `/api/attendance/status`, `/timeline` |
+| Agent / devices | `/api/agent/releases`, `/api/agent/register`, `/api/agent/heartbeat`, `/api/devices`, `/api/devices/me/status` |
+| Attendance | `/api/attendance/status`, `/timeline`, `/work/start`, `/work/end` |
 | Policies / corrections | `/api/attendance-policies`, `/api/attendance-corrections` |
 | Alerts / notifications | `/api/alerts`, `/api/notifications` |
 | Meetings | `/api/meetings` |
