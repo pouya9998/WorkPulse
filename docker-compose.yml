@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: workpulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_strong_password}
+      POSTGRES_DB: ${POSTGRES_DB:-workpulse}
+    volumes:
+      - workpulse_pg_data:/var/lib/postgresql/data
+    networks:
+      - workpulse_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workpulse} -d ${POSTGRES_DB:-workpulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    # برای تست/توسعه محلی؛ در Production پشت فایروال بگذارید یا این پورت را کامنت کنید
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: workpulse-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${API_PORT:-4000}
+      HOST: ${API_HOST:-0.0.0.0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://workpulse:change_me_strong_password@postgres:5432/workpulse?schema=public}
+      JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret_min_32_chars_long!!}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-ChangeMeAdmin123!}
+      BOOTSTRAP_ADMIN_FIRST_NAME: ${BOOTSTRAP_ADMIN_FIRST_NAME:-مدیر}
+      BOOTSTRAP_ADMIN_LAST_NAME: ${BOOTSTRAP_ADMIN_LAST_NAME:-سیستم}
+      BOOTSTRAP_ORG_NAME: ${BOOTSTRAP_ORG_NAME:-سازمان نمونه}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Tehran}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    networks:
+      - workpulse_internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+        INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000/api}
+    container_name: workpulse-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000/api}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    networks:
+      - workpulse_internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  workpulse_internal:
+    driver: bridge
+    name: workpulse_internal
+
+volumes:
+  workpulse_pg_data:
+    name: workpulse_pg_data

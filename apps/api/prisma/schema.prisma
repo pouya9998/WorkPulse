@@ -1,0 +1,999 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum ContractType {
+  HOURLY
+  FULL_TIME_REMOTE
+}
+
+enum RoleCode {
+  SUPER_ADMIN
+  ORGANIZATION_ADMIN
+  TEAM_LEAD
+  EMPLOYEE
+  PAYROLL_REVIEWER
+}
+
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum WorkSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum AttendanceEventType {
+  WORK_START
+  WORK_END
+  HEARTBEAT
+  IDLE_START
+  IDLE_END
+  SCREEN_LOCK
+  SCREEN_UNLOCK
+  AGENT_ONLINE
+  AGENT_OFFLINE
+}
+
+enum DeviceStateType {
+  ACTIVE
+  IDLE
+  LOCKED
+  OFFLINE
+  UNKNOWN
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  timezone  String   @default("Asia/Tehran")
+  locale    String   @default("fa-IR")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users          User[]
+  teams          Team[]
+  roles          Role[]
+  auditLogs      AuditLog[]
+  bootstrapState BootstrapState?
+  devices        RegisteredDevice[]
+  workSessions   WorkSession[]
+  attendanceEvents AttendanceEvent[]
+  gitlabConnection GitLabConnection?
+  gitlabProjects GitLabProject[]
+  gitlabUserMappings GitLabUserMapping[]
+  gitlabWebhookEvents GitLabWebhookEvent[]
+  contracts      Contract[]
+  compensationPolicies CompensationPolicy[]
+  payrollPeriods PayrollPeriod[]
+  mergeRequests MergeRequest[]
+  reviews Review[]
+  pipelines Pipeline[]
+  engineeringMetrics EngineeringMetric[]
+  compensationProposals CompensationProposal[]
+  attendancePolicies     AttendancePolicy[]
+  attendanceCorrections  AttendanceCorrection[]
+  alerts                 Alert[]
+  notifications          Notification[]
+  meetings               Meeting[]
+  calendarConnections    CalendarConnection[]
+  unresolvedIntervals    UnresolvedInterval[]
+
+  @@map("organizations")
+}
+
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String?  @map("organization_id")
+  code           RoleCode
+  nameFa         String   @map("name_fa")
+  descriptionFa  String?  @map("description_fa")
+  isSystem       Boolean  @default(true) @map("is_system")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  users        UserRole[]
+
+  @@unique([organizationId, code])
+  @@index([code])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameFa      String   @map("name_fa")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id              String       @id @default(cuid())
+  organizationId  String       @map("organization_id")
+  email           String
+  username        String
+  passwordHash    String       @map("password_hash")
+  firstName       String       @map("first_name")
+  lastName        String       @map("last_name")
+  phone           String?
+  jobTitle        String?      @map("job_title")
+  contractType    ContractType @default(FULL_TIME_REMOTE) @map("contract_type")
+  hireDate        DateTime?    @map("hire_date")
+  timezone        String       @default("Asia/Tehran")
+  status          UserStatus   @default(ACTIVE)
+  gitlabUsername  String?      @map("gitlab_username")
+  lastLoginAt     DateTime?    @map("last_login_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles        UserRole[]
+  teamMembers  TeamMember[]
+  sessions     UserSession[]
+  auditLogs    AuditLog[]   @relation("AuditActor")
+  devices      RegisteredDevice[]
+  workSessions WorkSession[]
+  attendanceEvents AttendanceEvent[]
+  heartbeats   HeartbeatEvent[]
+  deviceStates DeviceStateInterval[]
+  gitlabUserMappings GitLabUserMapping[]
+  mergeRequests MergeRequest[]
+  reviews      Review[]
+  pipelines    Pipeline[]
+  engineeringMetrics EngineeringMetric[]
+  contracts    Contract[]
+  compensationProposals CompensationProposal[]
+  attendanceCorrectionsRequested AttendanceCorrection[] @relation("CorrectionRequester")
+  attendanceCorrectionsReviewed  AttendanceCorrection[] @relation("CorrectionReviewer")
+  alerts                 Alert[]
+  notifications          Notification[]
+  meetingsCreated        Meeting[] @relation("MeetingCreator")
+  meetingParticipations  MeetingParticipant[]
+  calendarConnections    CalendarConnection[]
+  meetingAttendanceAsAttendee MeetingAttendanceRecord[] @relation("MeetingAttendee")
+  meetingAttendanceRecorded   MeetingAttendanceRecord[] @relation("MeetingAttendanceRecorder")
+  unresolvedIntervals    UnresolvedInterval[]
+  alertsAcknowledged     Alert[] @relation("AlertAcknowledger")
+  alertsResolved         Alert[] @relation("AlertResolver")
+
+  @@unique([organizationId, email])
+  @@unique([organizationId, username])
+  @@index([organizationId, status])
+  @@index([email])
+  @@map("users")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  isLead    Boolean  @default(false) @map("is_lead")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model UserSession {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenJti  String    @unique @map("token_jti")
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?  @map("organization_id")
+  actorUserId    String?  @map("actor_user_id")
+  action         String
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  metadata       Json?
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor        User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}
+
+/// وضعیت Bootstrap — پس از ایجاد اولین مدیر، completedAt پر می‌شود و Bootstrap غیرفعال می‌ماند
+model BootstrapState {
+  id             String    @id @default(cuid())
+  organizationId String    @unique @map("organization_id")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("bootstrap_state")
+}
+
+model RegisteredDevice {
+  id               String       @id @default(cuid())
+  organizationId   String       @map("organization_id")
+  userId           String       @map("user_id")
+  deviceUid        String       @map("device_uid")
+  name             String
+  platform         String
+  osVersion        String?      @map("os_version")
+  agentVersion     String       @map("agent_version")
+  tokenHash        String       @map("token_hash")
+  status           DeviceStatus @default(ACTIVE)
+  lastSeenAt       DateTime?    @map("last_seen_at")
+  lastHeartbeatAt  DateTime?    @map("last_heartbeat_at")
+  lastIpAddress    String?      @map("last_ip_address")
+  revokedAt        DateTime?    @map("revoked_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workSessions WorkSession[]
+  events       AttendanceEvent[]
+  heartbeats   HeartbeatEvent[]
+  stateIntervals DeviceStateInterval[]
+
+  @@unique([organizationId, deviceUid])
+  @@index([userId, status])
+  @@index([tokenHash])
+  @@map("registered_devices")
+}
+
+model WorkSession {
+  id             String            @id @default(cuid())
+  organizationId String            @map("organization_id")
+  userId         String            @map("user_id")
+  deviceId       String?           @map("device_id")
+  status         WorkSessionStatus @default(OPEN)
+  startedAt      DateTime          @map("started_at")
+  endedAt        DateTime?         @map("ended_at")
+  startedAtDevice DateTime?        @map("started_at_device")
+  endedAtDevice  DateTime?         @map("ended_at_device")
+  startEventId   String?           @map("start_event_id")
+  endEventId     String?           @map("end_event_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device       RegisteredDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  events       AttendanceEvent[]
+  heartbeats   HeartbeatEvent[]
+  stateIntervals DeviceStateInterval[]
+  breakIntervals BreakInterval[]
+  unresolvedIntervals UnresolvedInterval[]
+  attendanceCorrections AttendanceCorrection[]
+
+  @@index([userId, status, startedAt])
+  @@index([organizationId, startedAt])
+  @@map("work_sessions")
+}
+
+model AttendanceEvent {
+  id               String              @id @default(cuid())
+  organizationId   String              @map("organization_id")
+  userId           String              @map("user_id")
+  deviceId         String?             @map("device_id")
+  workSessionId    String?             @map("work_session_id")
+  clientEventId    String              @map("client_event_id")
+  type             AttendanceEventType
+  occurredAtDevice DateTime            @map("occurred_at_device")
+  receivedAtServer DateTime            @default(now()) @map("received_at_server")
+  sequence         BigInt?
+  outOfOrder       Boolean             @default(false) @map("out_of_order")
+  payload          Json?
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device       RegisteredDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  workSession  WorkSession?      @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, clientEventId])
+  @@index([userId, occurredAtDevice])
+  @@index([organizationId, type, occurredAtDevice])
+  @@index([workSessionId])
+  @@map("attendance_events")
+}
+
+model HeartbeatEvent {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  deviceId        String   @map("device_id")
+  workSessionId   String?  @map("work_session_id")
+  clientEventId   String   @map("client_event_id")
+  sentAtDevice    DateTime @map("sent_at_device")
+  receivedAtServer DateTime @default(now()) @map("received_at_server")
+  idleSeconds     Int?     @map("idle_seconds")
+  isLocked        Boolean  @default(false) @map("is_locked")
+  agentVersion    String?  @map("agent_version")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device      RegisteredDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workSession WorkSession?     @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, clientEventId])
+  @@index([deviceId, receivedAtServer])
+  @@index([userId, receivedAtServer])
+  @@map("heartbeat_events")
+}
+
+model DeviceStateInterval {
+  id            String          @id @default(cuid())
+  userId        String          @map("user_id")
+  deviceId      String          @map("device_id")
+  workSessionId String?         @map("work_session_id")
+  state         DeviceStateType
+  startedAt     DateTime        @map("started_at")
+  endedAt       DateTime?       @map("ended_at")
+  sourceEventId String?         @map("source_event_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device      RegisteredDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workSession WorkSession?     @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([deviceId, endedAt])
+  @@map("device_state_intervals")
+}
+
+enum AttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AlertType {
+  MISSING_WORK_START
+  HEARTBEAT_EXPIRED
+  AGENT_NOT_SYNCED
+  UNRESOLVED_TIME
+  MEETING_CONFLICT
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+enum MeetingParticipantRole {
+  ORGANIZER
+  REQUIRED
+  OPTIONAL
+}
+
+enum CalendarProvider {
+  MANUAL
+  GOOGLE
+  OUTLOOK
+  NONE
+}
+
+enum CalendarConnectionStatus {
+  ACTIVE
+  DISABLED
+  ERROR
+}
+
+model AttendancePolicy {
+  id                      String   @id @default(cuid())
+  organizationId          String   @map("organization_id")
+  nameFa                  String   @map("name_fa")
+  expectedWorkStartUtc    String   @map("expected_work_start_utc")
+  expectedWorkEndUtc      String   @map("expected_work_end_utc")
+  graceMinutes            Int      @default(15) @map("grace_minutes")
+  heartbeatTimeoutMinutes Int      @default(2) @map("heartbeat_timeout_minutes")
+  maxBreakMinutes         Int      @default(60) @map("max_break_minutes")
+  isDefault               Boolean  @default(false) @map("is_default")
+  isActive                Boolean  @default(true) @map("is_active")
+  notesFa                 String?  @map("notes_fa")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@map("attendance_policies")
+}
+
+model BreakInterval {
+  id            String    @id @default(cuid())
+  workSessionId String    @map("work_session_id")
+  startedAt     DateTime  @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+  noteFa        String?   @map("note_fa")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  workSession WorkSession @relation(fields: [workSessionId], references: [id], onDelete: Cascade)
+
+  @@index([workSessionId, startedAt])
+  @@map("break_intervals")
+}
+
+model UnresolvedInterval {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  workSessionId  String?   @map("work_session_id")
+  startedAt      DateTime  @map("started_at")
+  endedAt        DateTime? @map("ended_at")
+  reasonFa       String?   @map("reason_fa")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workSession  WorkSession? @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([organizationId, endedAt])
+  @@map("unresolved_intervals")
+}
+
+model AttendanceCorrection {
+  id               String                     @id @default(cuid())
+  organizationId   String                     @map("organization_id")
+  userId           String                     @map("user_id")
+  workSessionId    String?                    @map("work_session_id")
+  status           AttendanceCorrectionStatus @default(PENDING)
+  requestedStartAt DateTime?                  @map("requested_start_at")
+  requestedEndAt   DateTime?                  @map("requested_end_at")
+  reasonFa         String                     @map("reason_fa")
+  reviewNotesFa    String?                    @map("review_notes_fa")
+  reviewedById     String?                    @map("reviewed_by_id")
+  reviewedAt       DateTime?                  @map("reviewed_at")
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("CorrectionRequester", fields: [userId], references: [id], onDelete: Cascade)
+  workSession  WorkSession? @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+  reviewedBy   User?        @relation("CorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([userId, createdAt])
+  @@map("attendance_corrections")
+}
+
+model Alert {
+  id               String      @id @default(cuid())
+  organizationId   String      @map("organization_id")
+  userId           String      @map("user_id")
+  type             AlertType
+  status           AlertStatus @default(OPEN)
+  titleFa          String      @map("title_fa")
+  messageFa        String      @map("message_fa")
+  dedupeKey        String      @map("dedupe_key")
+  windowStart      DateTime    @map("window_start")
+  windowEnd        DateTime    @map("window_end")
+  acknowledgedAt   DateTime?   @map("acknowledged_at")
+  acknowledgedById String?     @map("acknowledged_by_id")
+  resolvedAt       DateTime?   @map("resolved_at")
+  resolvedById     String?     @map("resolved_by_id")
+  notesFa          String?     @map("notes_fa")
+  metadata         Json?
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedBy User?        @relation("AlertAcknowledger", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  resolvedBy     User?        @relation("AlertResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  notifications  Notification[]
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, status, createdAt])
+  @@index([userId, type, windowStart])
+  @@map("alerts")
+}
+
+model Notification {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  alertId        String?   @map("alert_id")
+  titleFa        String    @map("title_fa")
+  bodyFa         String    @map("body_fa")
+  readAt         DateTime? @map("read_at")
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alert        Alert?       @relation(fields: [alertId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+model Meeting {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  createdById    String        @map("created_by_id")
+  titleFa        String        @map("title_fa")
+  descriptionFa  String?       @map("description_fa")
+  startAt        DateTime      @map("start_at")
+  endAt          DateTime      @map("end_at")
+  status         MeetingStatus @default(SCHEDULED)
+  cancelledAt    DateTime?     @map("cancelled_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                 @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  occurrences  MeetingOccurrence[]
+  participants MeetingParticipant[]
+
+  @@index([organizationId, startAt])
+  @@index([organizationId, status])
+  @@map("meetings")
+}
+
+model MeetingOccurrence {
+  id          String    @id @default(cuid())
+  meetingId   String    @map("meeting_id")
+  startAt     DateTime  @map("start_at")
+  endAt       DateTime  @map("end_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  meeting           Meeting                   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  attendanceRecords MeetingAttendanceRecord[]
+
+  @@index([meetingId, startAt])
+  @@map("meeting_occurrences")
+}
+
+model MeetingParticipant {
+  id        String                 @id @default(cuid())
+  meetingId String                 @map("meeting_id")
+  userId    String                 @map("user_id")
+  role      MeetingParticipantRole @default(REQUIRED)
+  createdAt DateTime               @default(now()) @map("created_at")
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_participants")
+}
+
+model CalendarConnection {
+  id                   String                   @id @default(cuid())
+  organizationId       String                   @map("organization_id")
+  userId               String                   @map("user_id")
+  provider             CalendarProvider         @default(NONE)
+  status               CalendarConnectionStatus @default(DISABLED)
+  externalAccountId    String?                  @map("external_account_id")
+  tokenEncrypted       String?                  @map("token_encrypted")
+  refreshTokenEncrypted String?                 @map("refresh_token_encrypted")
+  tokenExpiresAt       DateTime?                @map("token_expires_at")
+  lastSyncAt           DateTime?                @map("last_sync_at")
+  lastError            String?                  @map("last_error")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, provider])
+  @@index([organizationId, provider])
+  @@map("calendar_connections")
+}
+
+model MeetingAttendanceRecord {
+  id                  String    @id @default(cuid())
+  meetingOccurrenceId String    @map("meeting_occurrence_id")
+  userId              String    @map("user_id")
+  actualJoinedAt      DateTime? @map("actual_joined_at")
+  actualLeftAt        DateTime? @map("actual_left_at")
+  recordedById        String?   @map("recorded_by_id")
+  notesFa             String?   @map("notes_fa")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  meetingOccurrence MeetingOccurrence @relation(fields: [meetingOccurrenceId], references: [id], onDelete: Cascade)
+  user              User              @relation("MeetingAttendee", fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy        User?             @relation("MeetingAttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([meetingOccurrenceId, userId])
+  @@index([userId, actualJoinedAt])
+  @@map("meeting_attendance_records")
+}
+
+enum GitLabConnectionStatus {
+  ACTIVE
+  ERROR
+  DISABLED
+}
+
+enum MergeRequestState {
+  OPENED
+  MERGED
+  CLOSED
+}
+
+enum PipelineStatus {
+  CREATED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELED
+  SKIPPED
+}
+
+enum PayrollPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum CompensationProposalStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model GitLabConnection {
+  id             String                 @id @default(cuid())
+  organizationId String                 @unique @map("organization_id")
+  baseUrl        String                 @map("base_url")
+  tokenEncrypted String                 @map("token_encrypted")
+  status         GitLabConnectionStatus @default(ACTIVE)
+  lastSyncAt     DateTime?              @map("last_sync_at")
+  lastError      String?                @map("last_error")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("gitlab_connections")
+}
+
+model GitLabProject {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  gitlabProjectId   Int      @map("gitlab_project_id")
+  pathWithNamespace String   @map("path_with_namespace")
+  name              String
+  isConnected       Boolean  @default(true) @map("is_connected")
+  lastSyncedAt      DateTime? @map("last_synced_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mergeRequests MergeRequest[]
+  pipelines     Pipeline[]
+
+  @@unique([organizationId, gitlabProjectId])
+  @@index([organizationId, isConnected])
+  @@map("gitlab_projects")
+}
+
+model GitLabUserMapping {
+  id               String   @id @default(cuid())
+  organizationId   String   @map("organization_id")
+  userId           String   @map("user_id")
+  gitlabUserId     Int      @map("gitlab_user_id")
+  gitlabUsername   String   @map("gitlab_username")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, gitlabUserId])
+  @@map("gitlab_user_mappings")
+}
+
+model GitLabWebhookEvent {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  deliveryId     String   @map("delivery_id")
+  eventType      String   @map("event_type")
+  payload        Json
+  processedAt    DateTime @default(now()) @map("processed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, deliveryId])
+  @@index([organizationId, eventType])
+  @@map("gitlab_webhook_events")
+}
+
+model MergeRequest {
+  id              String            @id @default(cuid())
+  organizationId  String            @map("organization_id")
+  projectId       String            @map("project_id")
+  userId          String?           @map("user_id")
+  gitlabMrIid     Int               @map("gitlab_mr_iid")
+  gitlabMrId      Int               @map("gitlab_mr_id")
+  title           String
+  state           MergeRequestState
+  sourceBranch    String            @map("source_branch")
+  targetBranch    String            @map("target_branch")
+  authorGitlabId  Int?              @map("author_gitlab_id")
+  openedAt        DateTime?         @map("opened_at")
+  mergedAt        DateTime?         @map("merged_at")
+  closedAt        DateTime?         @map("closed_at")
+  updatedAtGitlab DateTime?         @map("updated_at_gitlab")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      GitLabProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviews      Review[]
+
+  @@unique([projectId, gitlabMrIid])
+  @@index([organizationId, userId])
+  @@map("merge_requests")
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  mergeRequestId String   @map("merge_request_id")
+  userId         String?  @map("user_id")
+  gitlabNoteId   Int?     @map("gitlab_note_id")
+  reviewerGitlabId Int?   @map("reviewer_gitlab_id")
+  state          String
+  reviewedAt     DateTime @map("reviewed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mergeRequest MergeRequest @relation(fields: [mergeRequestId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([mergeRequestId])
+  @@index([organizationId, userId])
+  @@map("reviews")
+}
+
+model Pipeline {
+  id              String         @id @default(cuid())
+  organizationId  String         @map("organization_id")
+  projectId       String         @map("project_id")
+  userId          String?        @map("user_id")
+  gitlabPipelineId Int           @map("gitlab_pipeline_id")
+  ref             String
+  status          PipelineStatus
+  startedAt       DateTime?      @map("started_at")
+  finishedAt      DateTime?      @map("finished_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      GitLabProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, gitlabPipelineId])
+  @@index([organizationId, userId])
+  @@map("pipelines")
+}
+
+model EngineeringMetric {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  periodStart    DateTime @map("period_start")
+  periodEnd      DateTime @map("period_end")
+  mrOpened       Int      @default(0) @map("mr_opened")
+  mrMerged       Int      @default(0) @map("mr_merged")
+  reviewsGiven   Int      @default(0) @map("reviews_given")
+  pipelinesRun   Int      @default(0) @map("pipelines_run")
+  commitCount    Int      @default(0) @map("commit_count")
+  notesFa        String?  @map("notes_fa")
+  computedAt     DateTime @default(now()) @map("computed_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, periodStart, periodEnd])
+  @@map("engineering_metrics")
+}
+
+model Contract {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  userId         String       @map("user_id")
+  contractType   ContractType @map("contract_type")
+  currency       String       @default("IRR")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions     ContractVersion[]
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, isActive])
+  @@map("contracts")
+}
+
+model ContractVersion {
+  id             String       @id @default(cuid())
+  contractId     String       @map("contract_id")
+  versionNumber  Int          @map("version_number")
+  contractType   ContractType @map("contract_type")
+  hourlyRate     Decimal?     @map("hourly_rate") @db.Decimal(18, 4)
+  baseMonthly    Decimal?     @map("base_monthly") @db.Decimal(18, 2)
+  effectiveFrom  DateTime     @map("effective_from")
+  noteFa         String?      @map("note_fa")
+  createdById    String?      @map("created_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, versionNumber])
+  @@index([contractId, effectiveFrom])
+  @@map("contract_versions")
+}
+
+model CompensationPolicy {
+  id                    String   @id @default(cuid())
+  organizationId        String   @map("organization_id")
+  nameFa                String   @map("name_fa")
+  defaultCurrency       String   @default("IRR") @map("default_currency")
+  hourlyRoundingMinutes Int      @default(15) @map("hourly_rounding_minutes")
+  notesFa               String?  @map("notes_fa")
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@map("compensation_policies")
+}
+
+model PayrollPeriod {
+  id             String              @id @default(cuid())
+  organizationId String              @map("organization_id")
+  labelFa        String              @map("label_fa")
+  periodStart    DateTime            @map("period_start")
+  periodEnd      DateTime            @map("period_end")
+  status         PayrollPeriodStatus @default(OPEN)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposals    CompensationProposal[]
+
+  @@unique([organizationId, periodStart, periodEnd])
+  @@index([organizationId, status])
+  @@map("payroll_periods")
+}
+
+model CompensationProposal {
+  id                  String                     @id @default(cuid())
+  organizationId      String                     @map("organization_id")
+  payrollPeriodId     String                     @map("payroll_period_id")
+  userId              String                     @map("user_id")
+  contractVersionId   String?                    @map("contract_version_id")
+  status              CompensationProposalStatus @default(DRAFT)
+  proposedAmount      Decimal                    @map("proposed_amount") @db.Decimal(18, 2)
+  approvedPayableHours Decimal?                  @map("approved_payable_hours") @db.Decimal(10, 4)
+  formulaBreakdown    Json                       @map("formula_breakdown")
+  reviewerNotes       String?                    @map("reviewer_notes")
+  reviewedById        String?                    @map("reviewed_by_id")
+  reviewedAt          DateTime?                  @map("reviewed_at")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollPeriod PayrollPeriod          @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adjustments   CompensationAdjustment[]
+
+  @@unique([payrollPeriodId, userId])
+  @@index([organizationId, status])
+  @@map("compensation_proposals")
+}
+
+model CompensationAdjustment {
+  id          String   @id @default(cuid())
+  proposalId  String   @map("proposal_id")
+  labelFa     String   @map("label_fa")
+  amount      Decimal  @db.Decimal(18, 2)
+  isDeduction Boolean  @default(false) @map("is_deduction")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  proposal CompensationProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@map("compensation_adjustments")
+}

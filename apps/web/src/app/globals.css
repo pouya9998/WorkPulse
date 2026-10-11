@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f3f6f5;
+  --surface: #ffffff;
+  --text: #22262d;
+  --muted: #667589;
+  --border: #d5dae1;
+  --brand: #276756;
+  --brand-soft: #eef7f4;
+  --danger: #b42318;
+  --warning: #b54708;
+  --success: #027a48;
+}
+
+.dark {
+  --bg: #14181d;
+  --surface: #1c2229;
+  --text: #eef1f4;
+  --muted: #9aa6b5;
+  --border: #2f3843;
+  --brand: #4d9d86;
+  --brand-soft: #1a2c27;
+  --danger: #f97066;
+  --warning: #fdb022;
+  --success: #32d583;
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(77, 157, 134, 0.12), transparent 35%),
+    radial-gradient(circle at bottom left, rgba(33, 83, 70, 0.08), transparent 40%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-feature-settings: "ss01" on;
+}
+
+* {
+  font-family: Vazirmatn, Tahoma, sans-serif;
+}
+
+@layer components {
+  .card-surface {
+    @apply rounded-2xl border bg-[var(--surface)] shadow-panel;
+    border-color: var(--border);
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60;
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-xl bg-red-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200;
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .label-field {
+    @apply mb-1.5 block text-sm font-medium;
+    color: var(--text);
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "workpulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "پلتفرم متن‌باز مدیریت نیروی انسانی ریموت و ارزیابی عملکرد مهندسان نرم‌افزار",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=@workpulse/api",
+    "dev:web": "npm run dev --workspace=@workpulse/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspace=@workpulse/api",
+    "test:e2e": "npm run test:e2e --workspace=@workpulse/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:migrate": "npm run prisma:migrate --workspace=@workpulse/api",
+    "db:generate": "npm run prisma:generate --workspace=@workpulse/api"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "license": "AGPL-3.0-or-later"
+}
